@@ -9,10 +9,9 @@ path = "src/main.rs"
 
 [dependencies]
 risc0-zkvm = { version = "1.0" }
-risc0-build = { version = "1.0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
-httpx = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
 anyhow = "1.0"
 hex = "0.4"

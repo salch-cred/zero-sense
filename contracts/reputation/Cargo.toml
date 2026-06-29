@@ -1,5 +1,5 @@
 [package]
-name = "zerosense-verifier"
+name = "zerosense-reputation"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,7 +20,3 @@ strip = "symbols"
 debug-assertions = false
 panic = "abort"
 lto = true
-
-[profile.release-with-logs]
-inherits = "release"
-debug-assertions = true

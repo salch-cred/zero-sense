@@ -10,13 +10,8 @@ Handles all Stellar blockchain interactions:
 import os
 from typing import Optional
 
-from stellar_sdk import (
-    Keypair,
-    Network,
-    Server,
-    TransactionBuilder,
-)
-from stellar_sdk.soroban_rpc import SorobanServer
+from stellar_sdk import Keypair, Network, Server, TransactionBuilder
+from stellar_sdk.soroban_server import SorobanServer
 
 
 class StellarClient:
@@ -24,7 +19,6 @@ class StellarClient:
         if secret_key:
             self.keypair = Keypair.from_secret(secret_key)
         else:
-            # Generate a new keypair for development
             self.keypair = Keypair.random()
             print(f"[Stellar] ⚠️  No secret key — using random keypair for dev")
             print(f"[Stellar] Public key: {self.keypair.public_key}")
@@ -62,8 +56,7 @@ class StellarClient:
     ) -> str:
         """Submit ZK proof to ZeroSenseVerifier Soroban contract."""
         print(f"[Stellar] Submitting proof for task {task_id[:8]}...")
-        # TODO: Build and submit Soroban transaction
-        # stellar_sdk SorobanServer.send_transaction()
+        # TODO: Build Soroban transaction with stellar_sdk TransactionBuilder
         mock_tx = f"tx_{task_id[:8]}_verified"
         print(f"[Stellar] ✅ Proof verified on-chain: {mock_tx}")
         return mock_tx
@@ -95,5 +88,5 @@ class StellarClient:
 
     async def get_recent_contract_events(self, event_type: str) -> list:
         """Stream recent contract events from Stellar ledger."""
-        # TODO: Use Stellar Horizon /effects or Soroban event streaming
+        # TODO: Use Horizon /effects or Soroban event streaming
         return []

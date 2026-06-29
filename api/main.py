@@ -1,19 +1,19 @@
 """ZeroSense FastAPI Backend
 
-The main API server that connects:
-- Robot simulation → ZK proof generation → Stellar Soroban → Payments
-
 Endpoints:
-  POST /generate-proof     - Run AI inference + generate ZK proof
-  POST /verify-proof       - Submit proof to Stellar Soroban verifier
-  POST /claim-payment      - Trigger XLM payment after verified proof
-  POST /file-claim         - File insurance claim with ZK evidence
-  GET  /robot/{id}/status  - Get robot status, reputation, payment history
-  GET  /fleet/report       - Full fleet analytics dashboard
-  POST /guardian/start     - Start autonomous Guardian agent system
+  POST /generate-proof          - Run AI inference + generate ZK proof
+  POST /verify-proof            - Submit proof to Stellar Soroban verifier
+  POST /claim-payment           - Trigger XLM payment after verified proof
+  POST /file-insurance-claim    - File insurance claim with ZK evidence
+  POST /robot/register-identity - Register ZK biometric robot identity
+  GET  /robot/{id}/status       - Robot status, reputation, payment history
+  GET  /fleet/report            - Full fleet analytics
+  POST /guardian/start          - Start autonomous Guardian agent system
+  POST /guardian/stop           - Stop Guardian agent system
 """
 
 import asyncio
+import hashlib
 import os
 import uuid
 from typing import Optional
@@ -24,8 +24,8 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agents.guardian import ZeroSenseGuardianV2
-from stellar.client import StellarClient
+from api.agents.guardian import ZeroSenseGuardianV2
+from api.stellar.client import StellarClient
 from model.inference import RobotInferenceEngine
 
 load_dotenv()
@@ -49,10 +49,10 @@ stellar_client = StellarClient(
     network=os.getenv("STELLAR_NETWORK", "testnet"),
 )
 inference_engine = RobotInferenceEngine()
-guardian = None  # Started via /guardian/start endpoint
+guardian: Optional[ZeroSenseGuardianV2] = None
 
 
-# ─── Request/Response Models ────────────────────────────────────────────────
+# ─── Request/Response Models ───────────────────────────────────────────────────
 
 class SensorFrame(BaseModel):
     pixels: list[float]
@@ -81,6 +81,10 @@ class InsuranceClaimRequest(BaseModel):
     incident_proof_hash: str
     claim_amount: int  # in XLM stroops
 
+class RegisterIdentityRequest(BaseModel):
+    robot_id: str
+    sensor_noise_sample: list[float]
+
 class ProofResponse(BaseModel):
     task_id: str
     proof_hex: str
@@ -92,7 +96,7 @@ class ProofResponse(BaseModel):
     stellar_tx: Optional[str] = None
 
 
-# ─── Endpoints ───────────────────────────────────────────────────────────────
+# ─── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/")
 async def root():
@@ -108,20 +112,18 @@ async def root():
 async def generate_proof(req: GenerateProofRequest):
     """Step 1: Run AI inference on sensor data and generate ZK proof.
 
-    The sensor frames are processed by MobileNetV2 ONNX model,
-    then RISC Zero generates a ZK-STARK proof of the inference.
-    Sensor data NEVER leaves this function — only the proof hash is public.
+    Sensor frames are processed by MobileNetV2 ONNX model, then RISC Zero
+    generates a ZK-STARK proof of the inference. Sensor data NEVER leaves
+    this function — only the proof hash is public.
     """
     task_id = req.task_id or str(uuid.uuid4()).replace("-", "")[:32]
 
-    # Run AI inference
     frames = [frame.pixels for frame in req.sensor_frames]
     action, confidence, input_hash = inference_engine.run_inference(frames)
 
     action_labels = {0: "task_complete", 1: "obstacle_detected", 2: "incident"}
 
-    # Generate ZK proof via RISC Zero Bonsai API
-    proof_hex = await generate_risc_zero_proof(
+    proof_hex = await _generate_risc_zero_proof(
         sensor_frames=frames,
         model_hash=req.model_hash,
         task_id=task_id,
@@ -143,8 +145,7 @@ async def generate_proof(req: GenerateProofRequest):
 @app.post("/verify-proof")
 async def verify_proof(req: VerifyProofRequest, background_tasks: BackgroundTasks):
     """Step 2: Submit ZK proof to Stellar Soroban for on-chain verification.
-
-    If confidence >= 95, automatically triggers XLM payment.
+    Confidence >= 95 automatically triggers XLM payment.
     """
     try:
         tx_hash = await stellar_client.verify_proof_on_chain(
@@ -156,22 +157,18 @@ async def verify_proof(req: VerifyProofRequest, background_tasks: BackgroundTask
             action_type=req.action_type,
         )
 
-        result = {
+        if req.confidence >= 95:
+            background_tasks.add_task(
+                _auto_trigger_payment, req.task_id, req.confidence
+            )
+
+        return {
             "status": "verified",
             "task_id": req.task_id,
             "stellar_tx": tx_hash,
             "confidence": req.confidence,
             "auto_payment": req.confidence >= 95,
         }
-
-        # Auto-trigger payment if confidence is high enough
-        if req.confidence >= 95:
-            background_tasks.add_task(
-                auto_trigger_payment, req.task_id, req.confidence
-            )
-
-        return result
-
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -208,6 +205,21 @@ async def file_insurance_claim(req: InsuranceClaimRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/robot/register-identity")
+async def register_robot_identity(req: RegisterIdentityRequest):
+    """Register robot ZK biometric identity (hardware sensor noise fingerprint)."""
+    fingerprint_hash = _compute_prnu_fingerprint(req.sensor_noise_sample)
+    tx = await stellar_client.mint_soulbound_identity_token(
+        req.robot_id, fingerprint_hash
+    )
+    return {
+        "robot_id": req.robot_id,
+        "identity_hash": fingerprint_hash,
+        "soulbound_token_tx": tx,
+        "note": "ZK hardware fingerprint — cryptographically unforgeable identity",
+    }
+
+
 @app.get("/robot/{robot_id}/status")
 async def get_robot_status(robot_id: str):
     """Get robot status, ZREP reputation, and payment history."""
@@ -229,7 +241,7 @@ async def fleet_report():
         "total_zrep_minted": 0,
         "active_robots": 0,
         "insurance_claims": 0,
-        "guardian_status": "running" if guardian else "stopped",
+        "guardian_status": "running" if (guardian and guardian.running) else "stopped",
     }
 
 
@@ -244,8 +256,10 @@ async def start_guardian(background_tasks: BackgroundTasks):
     background_tasks.add_task(guardian.run)
     return {
         "status": "started",
-        "agents": ["PaymentAgent", "AnomalyAgent", "InsuranceAgent",
-                   "ReputationAgent", "LearningAgent", "OracleAgent", "AssistantAgent"],
+        "agents": [
+            "PaymentAgent", "AnomalyAgent", "InsuranceAgent",
+            "ReputationAgent", "LearningAgent", "OracleAgent", "AssistantAgent",
+        ],
         "message": "Guardian v2 running — 7 autonomous agents active",
     }
 
@@ -259,22 +273,9 @@ async def stop_guardian():
     return {"status": "stopped"}
 
 
-@app.post("/robot/register-identity")
-async def register_robot_identity(robot_id: str, sensor_noise_sample: list[float]):
-    """Register robot ZK biometric identity (hardware sensor noise fingerprint)."""
-    fingerprint_hash = compute_prnu_fingerprint(sensor_noise_sample)
-    tx = await stellar_client.mint_soulbound_identity_token(robot_id, fingerprint_hash)
-    return {
-        "robot_id": robot_id,
-        "identity_hash": fingerprint_hash,
-        "soulbound_token_tx": tx,
-        "note": "ZK hardware fingerprint — cryptographically unforgeable identity",
-    }
+# ─── Helper Functions ───────────────────────────────────────────────────────────
 
-
-# ─── Helper Functions ─────────────────────────────────────────────────────────
-
-async def generate_risc_zero_proof(
+async def _generate_risc_zero_proof(
     sensor_frames: list,
     model_hash: str,
     task_id: str,
@@ -283,8 +284,7 @@ async def generate_risc_zero_proof(
 ) -> str:
     """Generate ZK proof via RISC Zero Bonsai API."""
     if not bonsai_api_key:
-        # Development mode: return mock proof
-        return "0" * 512  # 256 bytes as hex
+        return "0" * 512  # Mock proof for development
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -305,7 +305,7 @@ async def generate_risc_zero_proof(
         return data.get("proof", "0" * 512)
 
 
-async def auto_trigger_payment(task_id: str, confidence: int):
+async def _auto_trigger_payment(task_id: str, confidence: int):
     """Background task: automatically trigger XLM payment."""
     try:
         await stellar_client.claim_payment(task_id=task_id, confidence=confidence)
@@ -314,13 +314,12 @@ async def auto_trigger_payment(task_id: str, confidence: int):
         print(f"[AutoPay] ❌ Payment failed for task {task_id}: {e}")
 
 
-def compute_prnu_fingerprint(noise_sample: list[float]) -> str:
+def _compute_prnu_fingerprint(noise_sample: list[float]) -> str:
     """Compute PRNU hardware fingerprint from sensor noise."""
-    import hashlib
     data = bytes([int(abs(x) * 255) % 256 for x in noise_sample])
     return hashlib.sha256(data).hexdigest()
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
