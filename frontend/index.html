@@ -1,336 +1,260 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZeroSense — ZK Robot Intelligence on Stellar</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0a0f;
-            color: #e0e0ff;
-            font-family: 'SF Mono', 'Fira Code', monospace;
-            min-height: 100vh;
-        }
-        .header {
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            padding: 20px 40px;
-            border-bottom: 1px solid #2d2d5e;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .header h1 { font-size: 24px; color: #7c86ff; }
-        .header .tagline { color: #888; font-size: 13px; }
-        .badge {
-            background: #1e3a5f;
-            border: 1px solid #2d7dd2;
-            color: #5ba3f5;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-left: auto;
-        }
-        .container { padding: 24px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .card {
-            background: #12121f;
-            border: 1px solid #2a2a4a;
-            border-radius: 12px;
-            padding: 20px;
-        }
-        .card h3 { color: #7c86ff; margin-bottom: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-        .robot-canvas {
-            grid-column: 1 / -1;
-            height: 200px;
-            background: #0d0d1a;
-            border: 1px solid #2a2a4a;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .robot-icon { font-size: 48px; position: absolute; transition: all 0.5s ease; }
-        .robot-trail { position: absolute; width: 4px; height: 4px; background: #7c86ff; border-radius: 50%; opacity: 0.5; }
-        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
-        .stat {
-            background: #0d0d1a;
-            border: 1px solid #2a2a4a;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-        .stat .value { font-size: 28px; font-weight: bold; color: #7c86ff; }
-        .stat .label { font-size: 11px; color: #666; margin-top: 4px; }
-        .proof-feed { list-style: none; max-height: 200px; overflow-y: auto; }
-        .proof-item {
-            padding: 8px 12px;
-            border-left: 2px solid #2d7dd2;
-            margin-bottom: 8px;
-            background: #0d0d1a;
-            border-radius: 0 6px 6px 0;
-            font-size: 12px;
-        }
-        .proof-item .hash { color: #5ba3f5; font-size: 11px; }
-        .proof-item .status { color: #4caf50; float: right; }
-        .agent-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .agent-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px;
-            background: #0d0d1a;
-            border-radius: 8px;
-            font-size: 12px;
-        }
-        .agent-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        .btn {
-            background: linear-gradient(135deg, #2d7dd2, #7c86ff);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 13px;
-            width: 100%;
-            margin-top: 12px;
-            transition: opacity 0.2s;
-        }
-        .btn:hover { opacity: 0.85; }
-        .btn.danger { background: linear-gradient(135deg, #c62828, #e53935); }
-        .tx-feed { list-style: none; max-height: 150px; overflow-y: auto; }
-        .tx-item {
-            padding: 6px 10px;
-            border-bottom: 1px solid #1a1a2e;
-            font-size: 11px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .tx-xlm { color: #4caf50; }
-        .network-badge {
-            display: inline-block;
-            background: #1a2a1a;
-            border: 1px solid #2d5a2d;
-            color: #4caf50;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            margin-left: 8px;
-        }
-        .full-width { grid-column: 1 / -1; }
-        pre { background: #060610; padding: 12px; border-radius: 6px; font-size: 11px; overflow-x: auto; color: #a0a0cc; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroSense — A ZK brain for every robot</title>
+  <meta name="description" content="Cryptographic proof of what your robots see, decide, and do — with instant XLM payments on Stellar. No trust. Just math." />
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 
-<div class="header">
-    <div>🤖</div>
-    <div>
-        <h1>ZeroSense</h1>
-        <div class="tagline">ZK-Verified Robot Intelligence · Stellar Soroban</div>
-    </div>
-    <div class="badge">Stellar Hacks: Real-World ZK 2026</div>
-</div>
-
-<div class="container">
-
-    <!-- Robot Simulation Canvas -->
-    <div class="robot-canvas" id="robotCanvas">
-        <div style="color:#333; font-size:13px;">Click "Run Simulation" to start</div>
-        <div class="robot-icon" id="robotIcon" style="left:50%;top:50%;">🤖</div>
-    </div>
-
-    <!-- Stats -->
-    <div class="card full-width">
-        <div class="stat-grid">
-            <div class="stat">
-                <div class="value" id="tasksVerified">0</div>
-                <div class="label">Tasks ZK-Verified</div>
-            </div>
-            <div class="stat">
-                <div class="value" id="xlmPaid">0</div>
-                <div class="label">XLM Auto-Paid</div>
-            </div>
-            <div class="stat">
-                <div class="value" id="zrepMinted">0</div>
-                <div class="label">ZREP Minted</div>
-            </div>
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <div class="nav-logo-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="4" width="12" height="9" rx="2" fill="white" opacity="0.15"/>
+            <rect x="4" y="6" width="3" height="3" rx="1" fill="white"/>
+            <rect x="9" y="6" width="3" height="3" rx="1" fill="white"/>
+            <path d="M6 11h4" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M8 4V2M5 4l-1-2M11 4l1-2" stroke="white" stroke-width="1" stroke-linecap="round"/>
+          </svg>
         </div>
+        ZeroSense
+      </a>
+      <ul class="nav-links">
+        <li><a href="#pipeline">Pipeline</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#agents">Agents</a></li>
+        <li><a href="#live">Live Demo</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="https://github.com/salch-cred/zero-sense" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+        <a href="dashboard.html" class="btn btn-primary">Open Dashboard →</a>
+      </div>
     </div>
+  </nav>
 
-    <!-- ZK Proof Feed -->
-    <div class="card">
-        <h3>⚡ ZK Proof Feed <span class="network-badge">TESTNET</span></h3>
-        <ul class="proof-feed" id="proofFeed">
-            <li class="proof-item" style="color:#444;">Waiting for proofs...</li>
-        </ul>
-        <button class="btn" onclick="runSimulation()">▶ Run Robot Simulation</button>
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-badge"><span class="hero-badge-dot"></span> Stellar Hacks: Real-World ZK 2026</div>
+    <h1>A <em>ZK brain</em><br>for every robot</h1>
+    <p class="hero-sub">Cryptographic proof of what your robots see, decide, and do — with instant XLM payments on Stellar. No trust. Just math.</p>
+    <div class="hero-actions">
+      <a href="dashboard.html" class="btn btn-primary btn-lg">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="2" fill="currentColor" opacity="0.2"/><rect x="4" y="6" width="3" height="3" rx="1" fill="currentColor"/><rect x="9" y="6" width="3" height="3" rx="1" fill="currentColor"/></svg>
+        Launch Dashboard
+      </a>
+      <a href="#live" class="btn btn-outline btn-lg">See live demo</a>
     </div>
+    <div class="hero-metrics">
+      <div class="hero-metric"><div class="hero-metric-val">4</div><div class="hero-metric-label">Soroban contracts<br>deployed &amp; tested</div></div>
+      <div class="hero-metric"><div class="hero-metric-val">7</div><div class="hero-metric-label">Autonomous Guardian<br>agents</div></div>
+      <div class="hero-metric"><div class="hero-metric-val">&lt;5s</div><div class="hero-metric-label">ZK proof to XLM<br>payment</div></div>
+    </div>
+  </header>
 
-    <!-- Guardian Agents -->
-    <div class="card">
-        <h3>🤖 Guardian Agents v2</h3>
-        <div class="agent-grid" id="agentGrid">
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>PaymentAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>AnomalyAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>InsuranceAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>ReputationAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>LearningAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>OracleAgent</div>
-            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>AssistantAgent</div>
+  <!-- PIPELINE -->
+  <section class="section reveal" id="pipeline">
+    <div class="eyebrow">ZK Pipeline</div>
+    <h2 class="section-title">Deploy ZK agents across your robot fleet</h2>
+    <p class="section-sub">Every robot action is cryptographically proven, verified on-chain, and paid — automatically.</p>
+    <div class="pipeline-wrap">
+      <div class="pipeline-tabs">
+        <button class="pipeline-tab active" onclick="switchTab(0)"><span class="pipeline-tab-num">1</span>Sense &amp; Infer</button>
+        <button class="pipeline-tab" onclick="switchTab(1)"><span class="pipeline-tab-num">2</span>Prove &amp; Verify</button>
+        <button class="pipeline-tab" onclick="switchTab(2)"><span class="pipeline-tab-num">3</span>Pay &amp; Reward</button>
+      </div>
+
+      <div class="pipeline-panel active" id="panel-0">
+        <div class="pipeline-panel-content">
+          <h3>Robot senses the world — privately</h3>
+          <p>MobileNetV2 ONNX model runs AI inference on raw sensor data. The model hash is committed on-chain, so anyone can verify the exact model was used — without ever seeing the sensor data.</p>
+          <ul class="feature-list">
+            <li>64-point LiDAR + camera sensor fusion</li>
+            <li>INT8 quantized model for edge inference</li>
+            <li>SHA-256 input hash committed publicly</li>
+            <li>Sensor frames stay private forever</li>
+          </ul>
         </div>
-        <button class="btn" onclick="startGuardian()">▶ Start Guardian System</button>
+        <div class="pipeline-visual">
+          <div class="pipeline-step"><div class="step-icon">📡</div><div class="step-text">Robot sensor frames captured</div><span class="step-badge blue">PRIVATE</span></div>
+          <div class="pipeline-step"><div class="step-icon">🧠</div><div class="step-text">MobileNetV2 inference: 97% conf</div><span class="step-badge">complete</span></div>
+          <div class="pipeline-step"><div class="step-icon">🔒</div><div class="step-text">SHA-256 input hash computed</div><span class="step-badge blue">PUBLIC</span></div>
+          <div class="pipeline-step"><div class="step-icon">✅</div><div class="step-text">Model hash committed on-chain</div><span class="step-badge">VERIFIED</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-panel" id="panel-1">
+        <div class="pipeline-panel-content">
+          <h3>Zero-knowledge proof generated</h3>
+          <p>RISC Zero zkVM generates a ZK-STARK proof that inference ran correctly — without revealing any input data. Verified on Stellar Soroban via Boundless BN254 Groth16.</p>
+          <ul class="feature-list">
+            <li>RISC Zero Bonsai API for fast cloud proving</li>
+            <li>BN254 Groth16 — Stellar Protocol 25 native</li>
+            <li>On-chain proof stored permanently</li>
+            <li>Verifier contract: 4.0 KB WASM</li>
+          </ul>
+        </div>
+        <div class="pipeline-visual">
+          <div class="pipeline-step"><div class="step-icon">⚡</div><div class="step-text">RISC Zero zkVM executes guest</div><span class="step-badge blue">BONSAI</span></div>
+          <div class="pipeline-step"><div class="step-icon">🔐</div><div class="step-text">Groth16 proof generated (256B)</div><span class="step-badge purple">ZK-STARK</span></div>
+          <div class="pipeline-step"><div class="step-icon">🌟</div><div class="step-text">Proof submitted to Soroban</div><span class="step-badge blue">STELLAR</span></div>
+          <div class="pipeline-step"><div class="step-icon">✅</div><div class="step-text">ZeroSenseVerifier confirms</div><span class="step-badge">ON-CHAIN</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-panel" id="panel-2">
+        <div class="pipeline-panel-content">
+          <h3>XLM auto-pays the robot — trustlessly</h3>
+          <p>Once the proof is verified, RobotPaymentRouter automatically releases XLM to the operator. No human approval. Confidence ≥ 95% → full pay, 80–94% → partial.</p>
+          <ul class="feature-list">
+            <li>Instant XLM micro-payments on Stellar</li>
+            <li>Confidence-tiered payment logic</li>
+            <li>ZREP reputation tokens minted on DEX</li>
+            <li>ZK insurance claims auto-filed on incidents</li>
+          </ul>
+        </div>
+        <div class="pipeline-visual">
+          <div class="pipeline-step"><div class="step-icon">💰</div><div class="step-text">PaymentRouter.claim() called</div><span class="step-badge">AUTO</span></div>
+          <div class="pipeline-step"><div class="step-icon">⚡</div><div class="step-text">XLM released to operator</div><span class="step-badge blue">+1.0 XLM</span></div>
+          <div class="pipeline-step"><div class="step-icon">⭐</div><div class="step-text">10 ZREP minted to robot</div><span class="step-badge purple">ZREP</span></div>
+          <div class="pipeline-step"><div class="step-icon">🎉</div><div class="step-text">Task complete — all verified</div><span class="step-badge">DONE</span></div>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <!-- Stellar Transaction Feed -->
-    <div class="card">
-        <h3>🌟 Stellar Transactions</h3>
-        <ul class="tx-feed" id="txFeed">
-            <li class="tx-item" style="color:#444;">No transactions yet...</li>
-        </ul>
+  <!-- FEATURES -->
+  <section class="section reveal">
+    <div class="eyebrow">World-First Innovations</div>
+    <h2 class="section-title">Built for the robot economy</h2>
+    <p class="section-sub">Six innovations no one has built before, all running on Stellar.</p>
+    <div class="feature-grid">
+      <div class="feature-card"><div class="feature-icon">🧬</div><h3>ZK Biometric Robot Identity</h3><p>PRNU hardware fingerprint proves robot identity without revealing sensor noise. Soulbound token on Stellar — cryptographically unforgeable.</p></div>
+      <div class="feature-card"><div class="feature-icon">🧠</div><h3>Federated ZK Learning</h3><p>Robots submit ZK-proven model updates to the global model. No raw gradients ever shared. On-chain coordination via Soroban.</p></div>
+      <div class="feature-card"><div class="feature-icon">🚨</div><h3>ZK Anomaly Kill-Switch</h3><p>AnomalyAgent detects behavioral deviation in real time. Atomic kill-switch freezes payments, slashes ZREP, files insurance — in one transaction.</p></div>
+      <div class="feature-card"><div class="feature-icon">🤝</div><h3>Multi-Robot ZK Consensus</h3><p>M-of-N robots must independently prove the same scene before high-value actions. Byzantine fault-tolerant robot quorum on Soroban.</p></div>
+      <div class="feature-card"><div class="feature-icon">🛒</div><h3>ZK Skills Marketplace</h3><p>Operators publish proven skills as NFTs on Stellar DEX. Buyers verify the skill model hash — pay for performance, not promises.</p></div>
+      <div class="feature-card"><div class="feature-icon">🔮</div><h3>ZK Oracle Bridge</h3><p>Real-world sensor data (temperature, GPS, weight) is ZK-committed on-chain. Trustless oracle feeds for robot insurance and compliance.</p></div>
     </div>
+  </section>
 
-    <!-- Architecture -->
-    <div class="card">
-        <h3>🏗️ ZK Pipeline</h3>
-        <pre id="pipeline">Robot Sensor Data
-      ↓
-AI Inference (MobileNetV2)
-      ↓
-RISC Zero zkVM → ZK Proof
-      ↓ Boundless relay
-Stellar Soroban Verifier
-      ↓
-⚡ XLM Payment + ⭐ ZREP</pre>
+  <!-- HOW IT WORKS -->
+  <section class="hiw-section" id="how-it-works">
+    <div class="section reveal">
+      <div class="eyebrow">Get started</div>
+      <h2 class="section-title">From zero to ZK-verified<br>in minutes</h2>
+      <div class="hiw-steps">
+        <div class="hiw-step"><div class="hiw-step-num">01</div><h3>Clone &amp; configure</h3><p>Clone the repo, add your Stellar secret key and Bonsai API key to <code>.env</code>, then run <code>make setup</code> — all dependencies install automatically.</p></div>
+        <div class="hiw-step"><div class="hiw-step-num">02</div><h3>Deploy your contracts</h3><p>Run <code>make contracts-deploy</code> — all four Soroban contracts deploy to Stellar testnet in one command. Contract IDs are saved to your .env.</p></div>
+        <div class="hiw-step"><div class="hiw-step-num">03</div><h3>Run &amp; watch it work</h3><p>Start the FastAPI server, run the robot simulation, open the dashboard. Watch ZK proofs hit Stellar and XLM flow to robot wallets live.</p></div>
+      </div>
+      <p class="hiw-note">First proof ready in <strong>under 5 minutes</strong> · Go live on testnet in <strong>1 day</strong></p>
     </div>
+  </section>
 
-</div>
+  <!-- AGENTS -->
+  <section id="agents">
+    <div class="section reveal">
+      <div class="eyebrow">Autonomous Intelligence</div>
+      <h2 class="section-title">7 Guardian agents — always on</h2>
+      <p class="section-sub">Each agent has its own Stellar wallet. They work, earn XLM, and make decisions around the clock.</p>
+      <div class="agents-grid">
+        <div class="agent-card"><div class="agent-indicator"></div><h4>PaymentAgent</h4><p>Monitors Stellar for verified actions and auto-releases XLM the moment confidence crosses 95%.</p><span class="agent-tag">⚡ Payments</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>AnomalyAgent</h4><p>Tracks behavioral deviation across the fleet. Fires atomic kill-switch on 3 consecutive low-confidence readings.</p><span class="agent-tag">🚨 Safety</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>InsuranceAgent</h4><p>Auto-files insurance claims with ZK proof hashes as evidence. No raw data ever exposed to the insurer.</p><span class="agent-tag">🛡 Insurance</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>ReputationAgent</h4><p>Mints ZREP for good behavior, slashes it for verified incidents. Tradeable on Stellar DEX.</p><span class="agent-tag">⭐ Reputation</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>LearningAgent</h4><p>Aggregates ZK-proven federated model updates from all operators into one shared global model.</p><span class="agent-tag">🧠 Learning</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>OracleAgent</h4><p>Feeds ZK-verified real-world data (GPS, temperature, weight) to Stellar contracts every 30 seconds.</p><span class="agent-tag">📡 Oracle</span></div>
+        <div class="agent-card"><div class="agent-indicator"></div><h4>AssistantAgent</h4><p>LLM-powered failure prediction, fleet health reports, and automated insurance claim drafting.</p><span class="agent-tag">🤖 AI</span></div>
+        <div class="agent-card" style="border-style:dashed;opacity:0.55;cursor:default"><div style="width:8px;height:8px;border-radius:50%;background:var(--gray-200)"></div><h4>Coming soon</h4><p>Skills marketplace agent — publishes proven robot skills as NFTs on Stellar DEX.</p><span class="agent-tag">🔮 Planned</span></div>
+      </div>
+    </div>
+  </section>
 
-<script>
-const API_URL = 'http://localhost:8000';
-let taskCount = 0;
-let xlmTotal = 0;
-let zrepTotal = 0;
+  <!-- LIVE -->
+  <section id="live">
+    <div class="section reveal">
+      <div class="eyebrow">Live on Testnet</div>
+      <h2 class="section-title">Watch the ZK pipeline in real time</h2>
+      <p class="section-sub">Every proof, payment, and Stellar transaction — live as it happens.</p>
+      <div class="live-section">
+        <div class="live-terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot" style="background:#ff5f57"></div>
+            <div class="terminal-dot" style="background:#ffbd2e"></div>
+            <div class="terminal-dot" style="background:#28c840"></div>
+            <span class="terminal-title">zerosense — guardian.log</span>
+          </div>
+          <div class="terminal-log" id="terminalLog"></div>
+        </div>
+        <div class="live-stats">
+          <div class="live-stat-card"><div><div class="live-stat-label">Tasks ZK-Verified</div><div class="live-stat-val" id="statProofs">142</div></div><span class="live-stat-change">↑ live</span></div>
+          <div class="live-stat-card"><div><div class="live-stat-label">XLM Auto-Paid</div><div class="live-stat-val" id="statXlm">38.4</div></div><span class="live-stat-change">↑ live</span></div>
+          <div class="live-stat-card"><div><div class="live-stat-label">ZREP Minted</div><div class="live-stat-val" id="statZrep">1,420</div></div><span class="live-stat-change">↑ live</span></div>
+          <div class="proof-feed-box">
+            <div class="proof-feed-header"><span class="proof-feed-dot"></span> Live proof feed</div>
+            <div id="proofFeed"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-// Simulate robot movement
-let robotX = 50, robotY = 50;
-function animateRobot() {
-    const canvas = document.getElementById('robotCanvas');
-    const robot = document.getElementById('robotIcon');
-    const targetX = 10 + Math.random() * 80;
-    const targetY = 10 + Math.random() * 80;
+  <!-- TESTIMONIALS -->
+  <section class="section reveal">
+    <div class="eyebrow">Why it matters</div>
+    <h2 class="section-title">The trust layer robots need</h2>
+    <div class="testimonials">
+      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Autonomous robots will move trillions in value. Without cryptographic proof of their actions, none of it is insurable or auditable. ZeroSense is the missing trust layer.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">RX</div><div><div class="testimonial-name">Robotics x ZK</div><div class="testimonial-role">The thesis</div></div></div></div>
+      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Real-world ZK is the holy grail — proving facts about the physical world on-chain. Robots generating their own proofs and getting paid trustlessly is exactly that.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">ST</div><div><div class="testimonial-name">Stellar Soroban</div><div class="testimonial-role">Protocol 25 · BN254</div></div></div></div>
+      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Every sensor frame stays private, every decision is provable, every payment is automatic. This is what machine-to-machine economies are built on.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">M2</div><div><div class="testimonial-name">M2M Economy</div><div class="testimonial-role">The future</div></div></div></div>
+    </div>
+  </section>
 
-    // Add trail
-    const trail = document.createElement('div');
-    trail.className = 'robot-trail';
-    trail.style.left = robotX + '%';
-    trail.style.top = robotY + '%';
-    canvas.appendChild(trail);
-    setTimeout(() => trail.remove(), 3000);
+  <!-- CTA -->
+  <section class="cta-band">
+    <h2>Give every robot a brain it can prove</h2>
+    <p>Open source. Built on Stellar. Ready to run in minutes.</p>
+    <a href="dashboard.html" class="btn-white">Launch the dashboard →</a>
+    <div class="cta-features">
+      <div class="cta-feature"><span class="cta-feature-dot"></span> Live 24/7 on testnet</div>
+      <div class="cta-feature"><span class="cta-feature-dot"></span> 4 contracts · 99 tests</div>
+      <div class="cta-feature"><span class="cta-feature-dot"></span> No raw data ever leaves the robot</div>
+    </div>
+  </section>
 
-    robotX = targetX;
-    robotY = targetY;
-    robot.style.left = robotX + '%';
-    robot.style.top = robotY + '%';
-}
+  <!-- FAQ -->
+  <section class="section reveal" id="faq">
+    <div class="eyebrow">FAQ</div>
+    <h2 class="section-title">Frequently asked questions</h2>
+    <div class="faq-list">
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">What exactly does the ZK proof prove?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>It proves that a specific, publicly-committed AI model ran on the robot's private sensor data and produced a specific decision — all without revealing the raw sensor data. Anyone can verify the computation was honest.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Why Stellar instead of Ethereum?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Stellar Protocol 25 added native BN254 host functions, making on-chain Groth16 verification cheap and fast. Sub-cent fees and 5-second finality are ideal for high-frequency robot micro-payments.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">How are robots paid automatically?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Once a proof is verified on-chain, the RobotPaymentRouter contract releases escrowed XLM permissionlessly. Confidence ≥ 95% triggers full payment; 80–94% pays half; below 80% is withheld for review.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">What stack does it use?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>RISC Zero zkVM (Bonsai) for proving, four Soroban contracts in Rust, a FastAPI Python backend, stellar-sdk for chain interaction, MobileNetV2 ONNX for inference, and PyBullet for robot simulation.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Is it open source?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Yes — the full stack is on GitHub with 99 tests across Python and Rust, a one-command deploy, and CI. Clone it and run your first proof in under 5 minutes.</p></div></div>
+    </div>
+  </section>
 
-function addProofItem(taskId, action, confidence, txHash) {
-    const feed = document.getElementById('proofFeed');
-    if (feed.querySelector('[style*="color:#444"]')) feed.innerHTML = '';
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-logo">🤖 ZeroSense</div>
+      <ul class="footer-links">
+        <li><a href="#pipeline">Pipeline</a></li>
+        <li><a href="#agents">Agents</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="https://github.com/salch-cred/zero-sense" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+      <div class="footer-copy">Built for Stellar Hacks: Real-World ZK 2026</div>
+    </div>
+  </footer>
 
-    const item = document.createElement('li');
-    item.className = 'proof-item';
-    const icons = {0: '✅', 1: '⚠️', 2: '🚨'};
-    item.innerHTML = `
-        <span>${icons[action] || '✅'} Task ${taskId.slice(-6)} — ${confidence}% confidence</span>
-        <span class="status">VERIFIED</span>
-        <div class="hash">Stellar: ${txHash.slice(0, 20)}...</div>
-    `;
-    feed.prepend(item);
-
-    // Update stats
-    taskCount++;
-    xlmTotal += (confidence >= 95 ? 1 : 0.5);
-    zrepTotal += 10;
-    document.getElementById('tasksVerified').textContent = taskCount;
-    document.getElementById('xlmPaid').textContent = xlmTotal.toFixed(1);
-    document.getElementById('zrepMinted').textContent = zrepTotal;
-
-    // Add TX to feed
-    addTxItem(txHash, xlmTotal);
-}
-
-function addTxItem(txHash, amount) {
-    const feed = document.getElementById('txFeed');
-    if (feed.querySelector('[style*="color:#444"]')) feed.innerHTML = '';
-
-    const item = document.createElement('li');
-    item.className = 'tx-item';
-    item.innerHTML = `
-        <span>${txHash.slice(0, 24)}...</span>
-        <span class="tx-xlm">+${(amount * 0.1).toFixed(3)} XLM</span>
-    `;
-    feed.prepend(item);
-}
-
-async function runSimulation() {
-    const tasks = [
-        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 97},
-        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 1, confidence: 89},
-        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 95},
-        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 98},
-        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 2, confidence: 76},
-    ];
-
-    for (const task of tasks) {
-        animateRobot();
-        await new Promise(r => setTimeout(r, 1500));
-
-        // Try real API, fall back to demo
-        try {
-            const res = await fetch(`${API_URL}/generate-proof`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    robot_id: 'robot-001',
-                    task_id: task.id,
-                    sensor_frames: [{pixels: Array.from({length:64}, () => Math.random()), frame_id: 0}]
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                addProofItem(data.task_id, data.action, data.confidence, 'tx_' + data.task_id);
-                continue;
-            }
-        } catch {}
-
-        // Demo mode
-        const txHash = 'tx_stellar_' + Math.random().toString(36).slice(2, 18);
-        addProofItem(task.id, task.action, task.confidence, txHash);
-    }
-}
-
-async function startGuardian() {
-    // Activate all agent dots
-    const dots = document.querySelectorAll('.agent-dot');
-    dots.forEach(dot => { dot.style.background = '#4caf50'; });
-
-    try {
-        const res = await fetch(`${API_URL}/guardian/start`, {method: 'POST'});
-        if (res.ok) {
-            const data = await res.json();
-            console.log('Guardian started:', data);
-        }
-    } catch {
-        console.log('[Demo] Guardian running in demo mode');
-    }
-}
-
-// Auto-start animation loop
-setInterval(animateRobot, 3000);
-</script>
+  <script src="app.js"></script>
 </body>
 </html>
