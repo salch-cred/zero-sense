@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroSense — ZK Robot Intelligence on Stellar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0ff;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            padding: 20px 40px;
+            border-bottom: 1px solid #2d2d5e;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header h1 { font-size: 24px; color: #7c86ff; }
+        .header .tagline { color: #888; font-size: 13px; }
+        .badge {
+            background: #1e3a5f;
+            border: 1px solid #2d7dd2;
+            color: #5ba3f5;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: auto;
+        }
+        .container { padding: 24px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .card {
+            background: #12121f;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .card h3 { color: #7c86ff; margin-bottom: 16px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+        .robot-canvas {
+            grid-column: 1 / -1;
+            height: 200px;
+            background: #0d0d1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .robot-icon { font-size: 48px; position: absolute; transition: all 0.5s ease; }
+        .robot-trail { position: absolute; width: 4px; height: 4px; background: #7c86ff; border-radius: 50%; opacity: 0.5; }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+        .stat {
+            background: #0d0d1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat .value { font-size: 28px; font-weight: bold; color: #7c86ff; }
+        .stat .label { font-size: 11px; color: #666; margin-top: 4px; }
+        .proof-feed { list-style: none; max-height: 200px; overflow-y: auto; }
+        .proof-item {
+            padding: 8px 12px;
+            border-left: 2px solid #2d7dd2;
+            margin-bottom: 8px;
+            background: #0d0d1a;
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+        }
+        .proof-item .hash { color: #5ba3f5; font-size: 11px; }
+        .proof-item .status { color: #4caf50; float: right; }
+        .agent-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .agent-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: #0d0d1a;
+            border-radius: 8px;
+            font-size: 12px;
+        }
+        .agent-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .btn {
+            background: linear-gradient(135deg, #2d7dd2, #7c86ff);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+            width: 100%;
+            margin-top: 12px;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn.danger { background: linear-gradient(135deg, #c62828, #e53935); }
+        .tx-feed { list-style: none; max-height: 150px; overflow-y: auto; }
+        .tx-item {
+            padding: 6px 10px;
+            border-bottom: 1px solid #1a1a2e;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .tx-xlm { color: #4caf50; }
+        .network-badge {
+            display: inline-block;
+            background: #1a2a1a;
+            border: 1px solid #2d5a2d;
+            color: #4caf50;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+        .full-width { grid-column: 1 / -1; }
+        pre { background: #060610; padding: 12px; border-radius: 6px; font-size: 11px; overflow-x: auto; color: #a0a0cc; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>🤖</div>
+    <div>
+        <h1>ZeroSense</h1>
+        <div class="tagline">ZK-Verified Robot Intelligence · Stellar Soroban</div>
+    </div>
+    <div class="badge">Stellar Hacks: Real-World ZK 2026</div>
+</div>
+
+<div class="container">
+
+    <!-- Robot Simulation Canvas -->
+    <div class="robot-canvas" id="robotCanvas">
+        <div style="color:#333; font-size:13px;">Click "Run Simulation" to start</div>
+        <div class="robot-icon" id="robotIcon" style="left:50%;top:50%;">🤖</div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card full-width">
+        <div class="stat-grid">
+            <div class="stat">
+                <div class="value" id="tasksVerified">0</div>
+                <div class="label">Tasks ZK-Verified</div>
+            </div>
+            <div class="stat">
+                <div class="value" id="xlmPaid">0</div>
+                <div class="label">XLM Auto-Paid</div>
+            </div>
+            <div class="stat">
+                <div class="value" id="zrepMinted">0</div>
+                <div class="label">ZREP Minted</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZK Proof Feed -->
+    <div class="card">
+        <h3>⚡ ZK Proof Feed <span class="network-badge">TESTNET</span></h3>
+        <ul class="proof-feed" id="proofFeed">
+            <li class="proof-item" style="color:#444;">Waiting for proofs...</li>
+        </ul>
+        <button class="btn" onclick="runSimulation()">▶ Run Robot Simulation</button>
+    </div>
+
+    <!-- Guardian Agents -->
+    <div class="card">
+        <h3>🤖 Guardian Agents v2</h3>
+        <div class="agent-grid" id="agentGrid">
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>PaymentAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>AnomalyAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>InsuranceAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>ReputationAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>LearningAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>OracleAgent</div>
+            <div class="agent-item"><div class="agent-dot" style="background:#666"></div>AssistantAgent</div>
+        </div>
+        <button class="btn" onclick="startGuardian()">▶ Start Guardian System</button>
+    </div>
+
+    <!-- Stellar Transaction Feed -->
+    <div class="card">
+        <h3>🌟 Stellar Transactions</h3>
+        <ul class="tx-feed" id="txFeed">
+            <li class="tx-item" style="color:#444;">No transactions yet...</li>
+        </ul>
+    </div>
+
+    <!-- Architecture -->
+    <div class="card">
+        <h3>🏗️ ZK Pipeline</h3>
+        <pre id="pipeline">Robot Sensor Data
+      ↓
+AI Inference (MobileNetV2)
+      ↓
+RISC Zero zkVM → ZK Proof
+      ↓ Boundless relay
+Stellar Soroban Verifier
+      ↓
+⚡ XLM Payment + ⭐ ZREP</pre>
+    </div>
+
+</div>
+
+<script>
+const API_URL = 'http://localhost:8000';
+let taskCount = 0;
+let xlmTotal = 0;
+let zrepTotal = 0;
+
+// Simulate robot movement
+let robotX = 50, robotY = 50;
+function animateRobot() {
+    const canvas = document.getElementById('robotCanvas');
+    const robot = document.getElementById('robotIcon');
+    const targetX = 10 + Math.random() * 80;
+    const targetY = 10 + Math.random() * 80;
+
+    // Add trail
+    const trail = document.createElement('div');
+    trail.className = 'robot-trail';
+    trail.style.left = robotX + '%';
+    trail.style.top = robotY + '%';
+    canvas.appendChild(trail);
+    setTimeout(() => trail.remove(), 3000);
+
+    robotX = targetX;
+    robotY = targetY;
+    robot.style.left = robotX + '%';
+    robot.style.top = robotY + '%';
+}
+
+function addProofItem(taskId, action, confidence, txHash) {
+    const feed = document.getElementById('proofFeed');
+    if (feed.querySelector('[style*="color:#444"]')) feed.innerHTML = '';
+
+    const item = document.createElement('li');
+    item.className = 'proof-item';
+    const icons = {0: '✅', 1: '⚠️', 2: '🚨'};
+    item.innerHTML = `
+        <span>${icons[action] || '✅'} Task ${taskId.slice(-6)} — ${confidence}% confidence</span>
+        <span class="status">VERIFIED</span>
+        <div class="hash">Stellar: ${txHash.slice(0, 20)}...</div>
+    `;
+    feed.prepend(item);
+
+    // Update stats
+    taskCount++;
+    xlmTotal += (confidence >= 95 ? 1 : 0.5);
+    zrepTotal += 10;
+    document.getElementById('tasksVerified').textContent = taskCount;
+    document.getElementById('xlmPaid').textContent = xlmTotal.toFixed(1);
+    document.getElementById('zrepMinted').textContent = zrepTotal;
+
+    // Add TX to feed
+    addTxItem(txHash, xlmTotal);
+}
+
+function addTxItem(txHash, amount) {
+    const feed = document.getElementById('txFeed');
+    if (feed.querySelector('[style*="color:#444"]')) feed.innerHTML = '';
+
+    const item = document.createElement('li');
+    item.className = 'tx-item';
+    item.innerHTML = `
+        <span>${txHash.slice(0, 24)}...</span>
+        <span class="tx-xlm">+${(amount * 0.1).toFixed(3)} XLM</span>
+    `;
+    feed.prepend(item);
+}
+
+async function runSimulation() {
+    const tasks = [
+        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 97},
+        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 1, confidence: 89},
+        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 95},
+        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 0, confidence: 98},
+        {id: 'task_' + Math.random().toString(36).slice(2,8), action: 2, confidence: 76},
+    ];
+
+    for (const task of tasks) {
+        animateRobot();
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Try real API, fall back to demo
+        try {
+            const res = await fetch(`${API_URL}/generate-proof`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    robot_id: 'robot-001',
+                    task_id: task.id,
+                    sensor_frames: [{pixels: Array.from({length:64}, () => Math.random()), frame_id: 0}]
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                addProofItem(data.task_id, data.action, data.confidence, 'tx_' + data.task_id);
+                continue;
+            }
+        } catch {}
+
+        // Demo mode
+        const txHash = 'tx_stellar_' + Math.random().toString(36).slice(2, 18);
+        addProofItem(task.id, task.action, task.confidence, txHash);
+    }
+}
+
+async function startGuardian() {
+    // Activate all agent dots
+    const dots = document.querySelectorAll('.agent-dot');
+    dots.forEach(dot => { dot.style.background = '#4caf50'; });
+
+    try {
+        const res = await fetch(`${API_URL}/guardian/start`, {method: 'POST'});
+        if (res.ok) {
+            const data = await res.json();
+            console.log('Guardian started:', data);
+        }
+    } catch {
+        console.log('[Demo] Guardian running in demo mode');
+    }
+}
+
+// Auto-start animation loop
+setInterval(animateRobot, 3000);
+</script>
+</body>
+</html>
