@@ -10,9 +10,15 @@ Endpoints:
   GET  /fleet/report            - Full fleet analytics
   POST /guardian/start          - Start autonomous Guardian agent system
   POST /guardian/stop           - Stop Guardian agent system
+
+SECURITY
+  - CORS origins come from ALLOWED_ORIGINS (comma separated). Defaults to
+    localhost only; set to "*" explicitly to open it.
+  - Money-moving / state-changing endpoints require an X-API-Key header that
+    matches ZEROSENSE_API_KEY when that env var is set. If it is unset the
+    check is skipped (dev mode) — set it in any real deployment.
 """
 
-import asyncio
 import hashlib
 import os
 import uuid
@@ -20,7 +26,7 @@ from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import Depends, FastAPI, Header, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -36,12 +42,26 @@ app = FastAPI(
     version="1.0.0",
 )
 
+_allowed_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://localhost:3000").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
 )
+
+
+def require_api_key(x_api_key: Optional[str] = Header(default=None)):
+    """Gate state-changing endpoints behind ZEROSENSE_API_KEY when configured."""
+    expected = os.getenv("ZEROSENSE_API_KEY", "")
+    if expected and x_api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
 
 # Initialize components
 stellar_client = StellarClient(
@@ -52,7 +72,7 @@ inference_engine = RobotInferenceEngine()
 guardian: Optional[ZeroSenseGuardianV2] = None
 
 
-# ─── Request/Response Models ───────────────────────────────────────────────────
+# ─── Request/Response Models ────────────────────────────────────────────
 
 class SensorFrame(BaseModel):
     pixels: list[float]
@@ -96,7 +116,7 @@ class ProofResponse(BaseModel):
     stellar_tx: Optional[str] = None
 
 
-# ─── Endpoints ─────────────────────────────────────────────────────────────────
+# ─── Endpoints ────────────────────────────────────────────────────
 
 @app.get("/")
 async def root():
@@ -108,7 +128,7 @@ async def root():
     }
 
 
-@app.post("/generate-proof", response_model=ProofResponse)
+@app.post("/generate-proof", response_model=ProofResponse, dependencies=[Depends(require_api_key)])
 async def generate_proof(req: GenerateProofRequest):
     """Step 1: Run AI inference on sensor data and generate ZK proof.
 
@@ -142,7 +162,7 @@ async def generate_proof(req: GenerateProofRequest):
     )
 
 
-@app.post("/verify-proof")
+@app.post("/verify-proof", dependencies=[Depends(require_api_key)])
 async def verify_proof(req: VerifyProofRequest, background_tasks: BackgroundTasks):
     """Step 2: Submit ZK proof to Stellar Soroban for on-chain verification.
     Confidence >= 95 automatically triggers XLM payment.
@@ -173,7 +193,7 @@ async def verify_proof(req: VerifyProofRequest, background_tasks: BackgroundTask
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/claim-payment")
+@app.post("/claim-payment", dependencies=[Depends(require_api_key)])
 async def claim_payment(req: ClaimPaymentRequest):
     """Step 3: Claim XLM payment for a verified task."""
     try:
@@ -186,7 +206,7 @@ async def claim_payment(req: ClaimPaymentRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/file-insurance-claim")
+@app.post("/file-insurance-claim", dependencies=[Depends(require_api_key)])
 async def file_insurance_claim(req: InsuranceClaimRequest):
     """File an insurance claim with ZK proof as evidence."""
     try:
@@ -205,7 +225,7 @@ async def file_insurance_claim(req: InsuranceClaimRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/robot/register-identity")
+@app.post("/robot/register-identity", dependencies=[Depends(require_api_key)])
 async def register_robot_identity(req: RegisterIdentityRequest):
     """Register robot ZK biometric identity (hardware sensor noise fingerprint)."""
     fingerprint_hash = _compute_prnu_fingerprint(req.sensor_noise_sample)
@@ -245,7 +265,7 @@ async def fleet_report():
     }
 
 
-@app.post("/guardian/start")
+@app.post("/guardian/start", dependencies=[Depends(require_api_key)])
 async def start_guardian(background_tasks: BackgroundTasks):
     """Start the ZeroSense Guardian v2 autonomous agent system."""
     global guardian
@@ -264,7 +284,7 @@ async def start_guardian(background_tasks: BackgroundTasks):
     }
 
 
-@app.post("/guardian/stop")
+@app.post("/guardian/stop", dependencies=[Depends(require_api_key)])
 async def stop_guardian():
     """Stop the Guardian agent system."""
     global guardian
@@ -273,7 +293,7 @@ async def stop_guardian():
     return {"status": "stopped"}
 
 
-# ─── Helper Functions ───────────────────────────────────────────────────────────
+# ─── Helper Functions ──────────────────────────────────────────────
 
 async def _generate_risc_zero_proof(
     sensor_frames: list,
@@ -301,8 +321,12 @@ async def _generate_risc_zero_proof(
             },
             timeout=60.0,
         )
+        response.raise_for_status()
         data = response.json()
-        return data.get("proof", "0" * 512)
+        proof = data.get("proof")
+        if not proof:
+            raise HTTPException(status_code=502, detail="Bonsai returned no proof")
+        return proof
 
 
 async def _auto_trigger_payment(task_id: str, confidence: int):
