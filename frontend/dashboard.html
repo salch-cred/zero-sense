@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroSense — Live Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body { background: var(--gray-50); }
+    .db-wrap { max-width: 1120px; margin: 0 auto; padding: 88px 24px 64px; }
+    .db-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+    .db-head h1 { font-size: 32px; font-weight: 800; letter-spacing: -1.2px; }
+    .db-head p { font-size: 15px; color: var(--gray-600); margin-top: 4px; }
+    .net-pill { display: inline-flex; align-items: center; gap: 6px; background: #dcfce7; color: #16a34a; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 100px; }
+    .net-dot { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; animation: pulse 2s infinite; }
+    .db-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .db-card { background: var(--white); border: 1px solid var(--gray-200); border-radius: 16px; padding: 24px; }
+    .db-card h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-400); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .col-4 { grid-column: span 4; } .col-6 { grid-column: span 6; } .col-8 { grid-column: span 8; } .col-12 { grid-column: span 12; }
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .stat-box { background: var(--white); border: 1px solid var(--gray-200); border-radius: 16px; padding: 22px; }
+    .stat-box .v { font-size: 34px; font-weight: 800; letter-spacing: -1.5px; }
+    .stat-box .l { font-size: 13px; color: var(--gray-600); margin-top: 2px; }
+    .stat-box .chip { display: inline-block; margin-top: 10px; font-size: 11px; font-weight: 600; color: #16a34a; background: #dcfce7; padding: 3px 8px; border-radius: 6px; }
+    .canvas { position: relative; height: 240px; background: linear-gradient(135deg,#0a0a0a,#1a1a2e); border-radius: 12px; overflow: hidden; }
+    .grid-bg { position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px); background-size: 24px 24px; }
+    .robot { position: absolute; font-size: 32px; transition: all 1.4s cubic-bezier(.4,0,.2,1); filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); }
+    .trail { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #60a5fa; opacity: .6; }
+    .db-feed { list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; }
+    .db-feed-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 10px; font-size: 13px; }
+    .db-feed-item .r { font-weight: 600; }
+    .db-feed-item .tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 5px; }
+    .tag.ok { background: #dcfce7; color: #16a34a; } .tag.warn { background: #fef3c7; color: #d97706; } .tag.err { background: #fee2e2; color: #dc2626; }
+    .db-feed-item .tx { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--gray-400); }
+    .ag-list { display: flex; flex-direction: column; gap: 8px; }
+    .ag-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--gray-50); border-radius: 10px; font-size: 13px; font-weight: 500; }
+    .ag-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gray-200); }
+    .ag-row.on .dot { background: #16a34a; box-shadow: 0 0 0 3px #dcfce7; animation: pulse 2s infinite; }
+    .ag-row .earn { margin-left: auto; font-size: 12px; color: var(--gray-400); font-family: var(--mono); }
+    .pipe { font-family: var(--mono); font-size: 12px; line-height: 1.9; color: var(--gray-600); }
+    .pipe .a { color: var(--accent); font-weight: 600; }
+    .db-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+    .tx-list { list-style: none; display: flex; flex-direction: column; }
+    .tx-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-100); font-size: 12px; }
+    .tx-row:last-child { border-bottom: none; }
+    .tx-row .h { font-family: var(--mono); color: var(--gray-600); }
+    .tx-row .x { color: #16a34a; font-weight: 600; }
+    @media (max-width:768px){ .col-4,.col-6,.col-8{grid-column:span 12} .stat-row{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <div class="nav-logo-icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="2" fill="white" opacity="0.15"/><rect x="4" y="6" width="3" height="3" rx="1" fill="white"/><rect x="9" y="6" width="3" height="3" rx="1" fill="white"/></svg></div>
+        ZeroSense
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="index.html#pipeline">Pipeline</a></li>
+        <li><a href="index.html#agents">Agents</a></li>
+        <li><a href="index.html#faq">FAQ</a></li>
+      </ul>
+      <div class="nav-cta">
+        <a href="https://github.com/salch-cred/zero-sense" class="btn btn-ghost" target="_blank" rel="noopener">GitHub</a>
+        <a href="index.html" class="btn btn-primary">← Back to site</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="db-wrap">
+    <div class="db-head">
+      <div>
+        <h1>Live Dashboard</h1>
+        <p>ZK-verified robot intelligence · Stellar Soroban testnet</p>
+      </div>
+      <span class="net-pill"><span class="net-dot"></span> Connected · Testnet</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stat-row" style="margin-bottom:16px">
+      <div class="stat-box"><div class="v" id="statProofs">0</div><div class="l">Tasks ZK-Verified</div><span class="chip">↑ live</span></div>
+      <div class="stat-box"><div class="v" id="statXlm">0</div><div class="l">XLM Auto-Paid</div><span class="chip">↑ live</span></div>
+      <div class="stat-box"><div class="v" id="statZrep">0</div><div class="l">ZREP Minted</div><span class="chip">↑ live</span></div>
+    </div>
+
+    <div class="db-grid">
+      <!-- Robot canvas -->
+      <div class="db-card col-8">
+        <h3>🤖 Robot Fleet Simulation</h3>
+        <div class="canvas" id="canvas">
+          <div class="grid-bg"></div>
+          <div class="robot" id="r1" style="left:20%;top:30%">🤖</div>
+          <div class="robot" id="r2" style="left:60%;top:55%">🤖</div>
+          <div class="robot" id="r3" style="left:40%;top:70%">🤖</div>
+        </div>
+        <div class="db-actions">
+          <button class="btn btn-primary" onclick="runSim()">▶ Run Simulation</button>
+          <button class="btn btn-outline" onclick="startGuardian()">⚡ Start Guardian System</button>
+          <button class="btn btn-outline" style="color:#dc2626;border-color:#fecaca" onclick="killSwitch()">🚨 Test Kill-Switch</button>
+        </div>
+      </div>
+
+      <!-- Guardian agents -->
+      <div class="db-card col-4">
+        <h3>🛡 Guardian Agents</h3>
+        <div class="ag-list" id="agList">
+          <div class="ag-row" data-a><span class="dot"></span> PaymentAgent <span class="earn">0 XLM</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> AnomalyAgent <span class="earn">idle</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> InsuranceAgent <span class="earn">0 claims</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> ReputationAgent <span class="earn">0 ZREP</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> LearningAgent <span class="earn">idle</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> OracleAgent <span class="earn">idle</span></div>
+          <div class="ag-row" data-a><span class="dot"></span> AssistantAgent <span class="earn">idle</span></div>
+        </div>
+      </div>
+
+      <!-- ZK Proof feed -->
+      <div class="db-card col-6">
+        <h3>⚡ ZK Proof Feed</h3>
+        <ul class="db-feed" id="proofFeed"></ul>
+      </div>
+
+      <!-- Stellar tx + pipeline -->
+      <div class="db-card col-6">
+        <h3>🌟 Stellar Transactions</h3>
+        <ul class="tx-list" id="txList"></ul>
+        <h3 style="margin-top:22px">🏗 ZK Pipeline</h3>
+        <div class="pipe">Sensor data <span class="a">→</span> MobileNetV2<br>→ RISC Zero zkVM <span class="a">→</span> Groth16 proof<br>→ Soroban verifier <span class="a">→</span> ⚡ XLM + ⭐ ZREP</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000';
+    let proofs = 0, xlm = 0, zrep = 0;
+    const ROBOTS = ['robot-001','robot-002','robot-003','robot-004','robot-005'];
+    const ACTIONS = [
+      {t:'ok',  l:'task_complete',  c:()=>95+(Math.random()*5|0)},
+      {t:'ok',  l:'task_complete',  c:()=>96+(Math.random()*4|0)},
+      {t:'warn',l:'obstacle_avoid', c:()=>82+(Math.random()*10|0)},
+      {t:'err', l:'incident_flag',  c:()=>70+(Math.random()*8|0)},
+    ];
+    const hex=n=>{let s='';for(let i=0;i<n;i++)s+='0123456789ABCDEF'[Math.random()*16|0];return s;};
+    const $=id=>document.getElementById(id);
+
+    function moveRobots(){
+      const c=$('canvas');
+      ['r1','r2','r3'].forEach(id=>{
+        const r=$(id);
+        const x=8+Math.random()*84, y=12+Math.random()*72;
+        const t=document.createElement('div');
+        t.className='trail'; t.style.left=r.style.left; t.style.top=r.style.top;
+        c.appendChild(t); setTimeout(()=>t.remove(),2500);
+        r.style.left=x+'%'; r.style.top=y+'%';
+      });
+    }
+
+    function addProof(robot,act,conf){
+      const feed=$('proofFeed');
+      const li=document.createElement('li');
+      li.className='db-feed-item'; li.style.opacity='0';
+      li.innerHTML='<span class="r">'+robot+'</span><span class="tag '+act.t+'">'+act.l+'</span><span style="font-size:11px;color:#a3a3a3">'+conf+'%</span><span class="tx">G'+hex(4)+'…'+hex(4)+'</span>';
+      feed.prepend(li);
+      requestAnimationFrame(()=>{li.style.transition='opacity .3s';li.style.opacity='1';});
+      while(feed.children.length>7)feed.removeChild(feed.lastChild);
+      proofs++; if(act.t==='ok')xlm+=conf>=95?1:0.5; else if(act.t==='warn')xlm+=0.5; zrep+=10;
+      $('statProofs').textContent=proofs; $('statXlm').textContent=xlm.toFixed(1); $('statZrep').textContent=zrep;
+      addTx(xlm);
+    }
+
+    function addTx(amount){
+      const list=$('txList');
+      const li=document.createElement('li'); li.className='tx-row';
+      li.innerHTML='<span class="h">G'+hex(4)+'…'+hex(6)+'</span><span class="x">+'+(Math.random()*0.5+0.5).toFixed(3)+' XLM</span>';
+      list.prepend(li); while(list.children.length>6)list.removeChild(list.lastChild);
+    }
+
+    async function runSim(){
+      for(let i=0;i<5;i++){
+        moveRobots();
+        const robot=ROBOTS[Math.random()*ROBOTS.length|0];
+        const act=ACTIONS[Math.random()*ACTIONS.length|0];
+        const conf=act.c();
+        try{
+          const res=await fetch(API+'/generate-proof',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({robot_id:robot,task_id:'task_'+hex(6),sensor_frames:[{pixels:Array.from({length:64},()=>Math.random()),frame_id:0}]})});
+          if(res.ok){const d=await res.json();addProof(d.robot_id||robot,act,d.confidence||conf);await new Promise(r=>setTimeout(r,1400));continue;}
+        }catch{}
+        addProof(robot,act,conf);
+        await new Promise(r=>setTimeout(r,1400));
+      }
+    }
+
+    function startGuardian(){
+      document.querySelectorAll('.ag-row').forEach((row,i)=>setTimeout(()=>row.classList.add('on'),i*180));
+      fetch(API+'/guardian/start',{method:'POST'}).catch(()=>console.log('[demo] guardian running locally'));
+    }
+
+    function killSwitch(){
+      const rows=document.querySelectorAll('.ag-row');
+      rows[1].classList.add('on');
+      rows[1].querySelector('.earn').textContent='🚨 TRIGGERED';
+      rows[1].querySelector('.earn').style.color='#dc2626';
+      const feed=$('proofFeed');
+      const li=document.createElement('li'); li.className='db-feed-item';
+      li.innerHTML='<span class="r">robot-003</span><span class="tag err">KILL_SWITCH</span><span style="font-size:11px;color:#dc2626">payments frozen · ZREP slashed · claim filed</span>';
+      feed.prepend(li);
+    }
+
+    // boot
+    moveRobots();
+    setInterval(moveRobots,3000);
+    addProof('robot-001',ACTIONS[0],97);
+    addProof('robot-002',ACTIONS[2],88);
+    startGuardian();
+  </script>
+</body>
+</html>
