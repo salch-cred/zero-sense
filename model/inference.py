@@ -28,6 +28,22 @@ ACTION_LABELS = {
 }
 
 
+def _softmax(logits: np.ndarray) -> np.ndarray:
+    """Numerically stable softmax.
+
+    Subtracting the max before exp prevents float overflow on large logits,
+    which would otherwise produce inf/inf = nan and crash int(nan).
+    """
+    logits = np.asarray(logits, dtype=np.float64)
+    shifted = logits - np.max(logits)
+    exp = np.exp(shifted)
+    total = np.sum(exp)
+    if total == 0 or not np.isfinite(total):
+        # Degenerate case — fall back to uniform distribution.
+        return np.full_like(exp, 1.0 / exp.size)
+    return exp / total
+
+
 class RobotInferenceEngine:
     """Runs AI inference on robot sensor data.
     Supports ONNX Runtime (production) and mock (development).
@@ -104,8 +120,9 @@ class RobotInferenceEngine:
         outputs = self.session.run(None, {input_name: input_tensor})
 
         logits = outputs[0][0]
-        predicted_class = int(np.argmax(logits))
-        confidence = int(np.max(np.exp(logits) / np.sum(np.exp(logits))) * 100)
+        probs = _softmax(logits)
+        predicted_class = int(np.argmax(probs))
+        confidence = int(np.max(probs) * 100)
 
         # Map class to robot action
         action = predicted_class % 3  # Map to 0, 1, or 2
