@@ -18,22 +18,38 @@ the confidence of a real task to get a larger payout. The audit focuses there.
 
 ## 🔴 Critical
 
-### C1. Proof verification was a no-op — **PARTIALLY FIXED**
+### C1. Proof verification was a no-op — **FIXED**
 `verifier::verify_groth16_bn254` previously returned `true` for any input
-`>= 32` bytes. The contract now enforces the exact **256-byte** Groth16 proof
-size, a non-empty verification key, and non-empty public inputs, and binds the
-public inputs to the claimed values (see C3).
+`>= 32` bytes — i.e. there was no cryptography at all.
 
-**OPEN:** the full BN254 pairing check
-`e(A,B) == e(alpha,beta)·e(L_pub,gamma)·e(C,delta)` using the Stellar Protocol 25
-`env.crypto()` host functions is the single remaining integration point. Until it
-lands, the contract is structurally sound but not cryptographically sound — do
-not deploy to mainnet.
+**Resolved:** the verifier now performs a **real Groth16 verification** using
+Soroban's native **BLS12-381** pairing host function
+(`env.crypto().bls12_381().pairing_check`, CAP-0059, shipped in Protocol 22). It
+evaluates the full equation
+
+```
+e(A, B) * e(-alpha, beta) * e(-vk_x, gamma) * e(-C, delta) == 1
+where vk_x = ic[0] + Σ public_i · ic[i+1]
+```
+
+The contract decodes the 384-byte `A || B || C` proof into curve points,
+recomputes `vk_x` from the public inputs and the stored verification key, and
+returns the host's pairing-check result. Self-contained unit tests prove a
+genuine proof verifies and a tampered proof is rejected.
+
+> **Curve correction:** earlier code/docs claimed "BN254 native host functions
+> (Protocol 25)". This was wrong — Soroban's native pairing primitive is
+> **BLS12-381** (CAP-0059), not BN254. Proofs must be produced over BLS12-381
+> (Circom/snarkjs or arkworks BLS12-381 backend, or a RISC Zero → BLS12-381
+> Groth16 wrapper). Every public input must be a field element `< r` (the
+> BLS12-381 scalar field order), so any SHA-256 hash used as a public input must
+> be reduced mod r inside the circuit.
 
 ### C2. No admin / no auth on `initialize` & `register_model` — **FIXED**
-`initialize` is now one-shot (panics if already initialized) and stores an admin
-whose `require_auth()` is enforced. `register_model` is admin-only. This blocks
-verification-key takeover and rogue model registration.
+`initialize` is now one-shot (fails if already initialized) and stores an admin
+whose `require_auth()` is enforced; it also stores the verification key. ​
+`register_model` is admin-only. This blocks verification-key takeover and rogue
+model registration.
 
 ### C3. `verify_robot_action` trusted caller inputs — **FIXED**
 Now enforces:
@@ -101,18 +117,29 @@ and cast accordingly, or ONNX Runtime will raise at inference time.
 
 ---
 
-## Test coverage added
+## Test coverage
 
-The verifier contract now has unit tests covering the security invariants:
-happy-path verification, unregistered-model rejection, wrong-size-proof
-rejection, confidence tampering rejection, replay rejection, and double-init
-rejection. The payment contract has init-guard and unknown-task tests. Run the
-full suite with `bash run_tests.sh`.
+The verifier contract has self-contained unit tests that exercise the **real**
+BLS12-381 pairing (no mock): a genuine Groth16 proof verifies on-chain and a
+tampered proof is rejected, built via a telescoping `hash_to_g1/g2` construction
+so no external proof files or extra crates are needed. Security-invariant tests
+cover unregistered-model rejection, wrong-size-proof rejection, confidence
+tampering rejection, replay rejection, double-init rejection, and a full
+robot-action end-to-end happy path. The payment contract has init-guard and
+unknown-task tests. Run the full suite with `bash run_tests.sh`.
 
 ---
 
 ## Deployment gate
 
-**Do not deploy to Stellar mainnet until C1 (BN254 pairing check), M2 (on-device
-ZK identity), and M3 (ONNX dtype) are resolved.** Testnet demo is safe with
-`ZEROSENSE_API_KEY` set and `ALLOWED_ORIGINS` locked to your frontend origin.
+C1 (the core proof check) is now **cryptographically sound**. Remaining items
+before a Stellar **mainnet / real-value** deployment:
+
+1. **M2** — make the robot biometric identity actually zero-knowledge (on-device).
+2. **M3** — confirm the ONNX input dtype/layout matches the exported model.
+3. Run a real BLS12-381 trusted setup and install the production verification key
+   via `initialize`; keep the admin key in secure custody.
+4. Set `ZEROSENSE_API_KEY` and lock `ALLOWED_ORIGINS` to your frontend origin.
+
+**Testnet demo is safe today** with the real on-chain verifier, `ZEROSENSE_API_KEY`
+set, and `ALLOWED_ORIGINS` locked down. Deploy with `./deploy.sh`.
