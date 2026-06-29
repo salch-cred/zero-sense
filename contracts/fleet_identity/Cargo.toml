@@ -1,0 +1,21 @@
+[package]
+name = "fleet_identity"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+# X-Ray (Protocol 25) native ZK primitives require an X-Ray-capable SDK.
+# crypto::bn254 + Poseidon live behind the `hazmat-crypto` feature.
+soroban-sdk = { version = "26.0.0", features = ["hazmat-crypto"] }
+# Official Stellar Poseidon SDK (sponge over the host Poseidon permutation).
+# BN254 parameters match circomlib, so off-chain Circom/snarkjs proofs are compatible.
+soroban-poseidon = { git = "https://github.com/stellar/rs-soroban-poseidon" }
+
+[dev-dependencies]
+soroban-sdk = { version = "26.0.0", features = ["hazmat-crypto", "testutils"] }
+soroban-poseidon = { git = "https://github.com/stellar/rs-soroban-poseidon" }
