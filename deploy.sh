@@ -2,7 +2,7 @@
 # =============================================================================
 # ZeroSense — Stellar Testnet Deployment
 # -----------------------------------------------------------------------------
-# Builds and deploys all four Soroban contracts to Stellar testnet, records the
+# Builds and deploys all Soroban contracts to Stellar testnet, records the
 # resulting contract IDs, and prints stellar.expert explorer links so the
 # deployment is independently verifiable (the credibility signal judges look
 # for).
@@ -11,6 +11,7 @@
 #   ./deploy.sh                 # uses identity 'zerosense-dev' on testnet
 #   IDENTITY=mykey ./deploy.sh  # override signing identity
 #   NETWORK=testnet ./deploy.sh # override network
+#   FLEET_DEPTH=20 ./deploy.sh  # override fleet identity Merkle tree depth
 #
 # Requirements: stellar-cli (`cargo install stellar-cli`), Rust wasm target.
 # =============================================================================
@@ -22,6 +23,7 @@ TARGET="wasm32v1-none"
 OUT_DIR="deploy"
 DEPLOY_LOG="$OUT_DIR/contract_ids.env"
 
+# Contracts with a plain (no-arg) deploy; constructor-arg contracts handled below.
 CONTRACTS=(verifier payment reputation insurance)
 
 mkdir -p "$OUT_DIR"
@@ -40,16 +42,18 @@ stellar keys fund "$IDENTITY" --network "$NETWORK" || true
 ADMIN_ADDR="$(stellar keys address "$IDENTITY")"
 echo "==> Admin address: $ADMIN_ADDR"
 
-# ---- 2. Build + deploy each contract ----------------------------------------
-deploy_one() {
+# ---- 2. Build + deploy each plain contract ----------------------------------
+build_one() {
   local name="$1"
   echo ""
   echo "================================================================="
   echo "==> Building contracts/$name"
   ( cd "contracts/$name" && stellar contract build )
+}
 
-  # Resolve the produced wasm (package names use the zerosense_<name> pattern,
-  # but fall back to any wasm in the release dir to be robust to renames).
+resolve_wasm() {
+  # echoes the path to the produced wasm for contract $1
+  local name="$1"
   local rel_dir="contracts/$name/target/$TARGET/release"
   local wasm="$rel_dir/zerosense_${name}.wasm"
   if [[ ! -f "$wasm" ]]; then
@@ -59,20 +63,38 @@ deploy_one() {
     echo "ERROR: no wasm artifact found for $name in $rel_dir" >&2
     exit 1
   fi
+  echo "$wasm"
+}
 
-  echo "==> Deploying $name ($wasm)"
-  local cid
-  cid="$(stellar contract deploy --wasm "$wasm" --source "$IDENTITY" --network "$NETWORK")"
-
+record_id() {
+  local name="$1" cid="$2"
   local var
   var="$(echo "$name" | tr '[:lower:]' '[:upper:]')_CONTRACT_ID"
   echo "${var}=${cid}" | tee -a "$DEPLOY_LOG"
   echo "Explorer: https://stellar.expert/explorer/$NETWORK/contract/$cid"
 }
 
+deploy_one() {
+  local name="$1"
+  build_one "$name"
+  local wasm; wasm="$(resolve_wasm "$name")"
+  echo "==> Deploying $name ($wasm)"
+  local cid
+  cid="$(stellar contract deploy --wasm "$wasm" --source "$IDENTITY" --network "$NETWORK")"
+  record_id "$name" "$cid"
+}
+
 for c in "${CONTRACTS[@]}"; do
   deploy_one "$c"
 done
+
+# ---- 2b. Deploy fleet_identity (constructor needs admin + Merkle tree depth) -
+FLEET_DEPTH="${FLEET_DEPTH:-20}"
+build_one "fleet_identity"
+FI_WASM="$(resolve_wasm "fleet_identity")"
+echo "==> Deploying fleet_identity ($FI_WASM) admin=$ADMIN_ADDR depth=$FLEET_DEPTH"
+FI_ID="$(stellar contract deploy --wasm "$FI_WASM" --source "$IDENTITY" --network "$NETWORK" -- --admin "$ADMIN_ADDR" --depth "$FLEET_DEPTH")"
+record_id "fleet_identity" "$FI_ID"
 
 # ---- 3. Next steps ----------------------------------------------------------
 echo ""
@@ -90,3 +112,8 @@ echo ""
 echo "  stellar contract invoke --id \"\$VERIFIER_CONTRACT_ID\" \\"
 echo "    --source $IDENTITY --network $NETWORK -- \\"
 echo "    register_model --model_hash <HASH32> --model_name MobileNetV2-INT8"
+echo ""
+echo "Then enroll a robot identity into the fleet (admin-only):"
+echo "  stellar contract invoke --id \"\$FLEET_IDENTITY_CONTRACT_ID\" \\"
+echo "    --source $IDENTITY --network $NETWORK -- \\"
+echo "    register_robot --commitment <POSEIDON_COMMITMENT_U256>"
