@@ -50,6 +50,15 @@ ZeroSense Guardian (7 Autonomous Agents)
 
 This is the missing accountability layer for the robot economy: **anonymous, unlinkable, but non-repudiable and replay-proof.**
 
+### The ZK backbone: `contracts/bn254_verifier`
+
+A generic, circuit-agnostic Groth16-over-**BN254** verifier using Stellar's native Protocol 25 host functions (`g1_add`, `g1_mul`, `pairing_check` — CAP-0074). It's the reusable on-chain building block for two upgrades:
+
+1. **Fully zero-knowledge fleet membership** — once `circuits/fleet_membership.circom` (Poseidon Merkle inclusion) goes through a trusted setup, `fleet_identity` calls this verifier instead of checking the Merkle path transparently, so a robot proves membership *without revealing the path at all*.
+2. **Native BN254 verification of RISC Zero receipts** wrapped as Groth16/BN254 proofs — an alternative to the BLS12-381 path for cheaper on-chain verification.
+
+Its test suite verifies a **real Gnark-generated Groth16/BN254 proof** end-to-end through the actual Soroban `pairing_check` host function — not a mock, not a stub.
+
 ---
 
 ## ✅ What's Real vs. What's Mocked
@@ -58,14 +67,15 @@ Radical honesty — because "load-bearing ZK, actually verified on-chain" is the
 
 | Component | Status | Notes |
 |---|---|---|
-| **On-chain Groth16 verification** | ✅ **REAL** | `contracts/verifier` runs the full Groth16 equation via Soroban's native BLS12-381 `pairing_check` host function (CAP-0059). Not a stub. |
+| **On-chain Groth16 verification (BLS12-381)** | ✅ **REAL** | `contracts/verifier` runs the full Groth16 equation via Soroban's native BLS12-381 `pairing_check` host function (CAP-0059). Not a stub. |
+| **On-chain Groth16 verification (BN254)** | ✅ **REAL** | `contracts/bn254_verifier` runs the same Groth16 equation via native BN254 `pairing_check` (CAP-0074). Tested against a real Gnark-generated proof + verification key, not synthetic data. |
 | **zk-Fleet Identity (Poseidon Merkle + nullifiers)** | ✅ **REAL** | `contracts/fleet_identity` builds an incremental Poseidon Merkle tree, rolling 32-root history, and a one-time nullifier set using native X-Ray Poseidon (CAP-0075). Self-contained tests run real on-chain Poseidon — no mocks. |
 | **Verifier security model** | ✅ **REAL** | One-shot admin init, admin-only model registry, `robot.require_auth`, replay protection, public-input binding. Unit-tested. |
 | **Payment uses verified confidence** | ✅ **REAL** | `payment` reads confidence cross-contract from the verifier; never trusts a caller-supplied value. |
-| **Contract test suite** | ✅ **REAL** | Self-contained BLS12-381 pairing tests + real-Poseidon fleet-identity tests (membership, double-spend, unknown-root, tree-full) + Python API tests. |
-| **Testnet deployment** | ⚠️ **Run `./deploy.sh`** | Script deploys all five contracts and prints stellar.expert links. Paste the resulting contract IDs below. |
+| **Contract test suite** | ✅ **REAL** | Self-contained BLS12-381 pairing tests + real-Gnark BN254 pairing tests + real-Poseidon fleet-identity tests (membership, double-spend, unknown-root, tree-full) + Python API tests. |
+| **Testnet deployment** | ⚠️ **Run `./deploy.sh`** | Script deploys verifier/payment/reputation/insurance/fleet_identity and prints stellar.expert links. `bn254_verifier` is built by the same script but deployed separately once a real circuit VK exists (see below). Paste the resulting contract IDs below. |
 | **Off-chain proving (RISC Zero / Bonsai)** | ⚠️ **Optional/mockable** | The pipeline can run with Bonsai, or with a mock prover for local demos. The on-chain check is identical either way. |
-| **Fleet-identity zero-knowledge upgrade** | ⚠️ **Documented** | Membership is currently a transparent on-chain Merkle check. The Circom/Groth16 circuit that makes the membership proof fully zero-knowledge is specified in `contracts/fleet_identity/src/lib.rs` and pluggable into the verifier. |
+| **Fleet-identity zero-knowledge upgrade** | ⚠️ **In progress** | Membership is currently a transparent on-chain Merkle check. The generic on-chain verifier it will call (`contracts/bn254_verifier`) is built and real-proof-tested; the `circuits/fleet_membership.circom` circuit, its trusted setup, and the `submit_action_zk` wiring into `fleet_identity` are the remaining steps. |
 | **Robot input (PyBullet sim)** | ⚠️ **Simulated** | Warehouse robot is a PyBullet simulation, not physical hardware. |
 | **Guardian agents** | ⚠️ **Partial** | Orchestration scaffolding; PaymentAgent path is wired end-to-end, others are in progress. |
 
@@ -73,6 +83,7 @@ Radical honesty — because "load-bearing ZK, actually verified on-chain" is the
 > - Verifier: `C...`  — https://stellar.expert/explorer/testnet/contract/C...
 > - Payment: `C...`
 > - Fleet Identity: `C...`
+> - BN254 Verifier: `C...` _(deploy once a real circuit VK exists — see `deploy.sh`)_
 
 ---
 
@@ -82,6 +93,7 @@ Radical honesty — because "load-bearing ZK, actually verified on-chain" is the
 zerosense/
 ├── contracts/           # Soroban smart contracts (Rust)
 │   ├── verifier/        # ZeroSenseVerifier — REAL BLS12-381 Groth16 pairing_check
+│   ├── bn254_verifier/  # Generic Groth16-over-BN254 verifier — REAL, real-proof-tested
 │   ├── fleet_identity/  # zk-Fleet Identity — Poseidon Merkle tree + one-time nullifiers
 │   ├── payment/         # RobotPaymentRouter — auto XLM payment on verified proof
 │   ├── reputation/      # ZRepToken — robot reputation Stellar asset
@@ -111,9 +123,10 @@ cargo install stellar-cli
 pip install fastapi uvicorn stellar-sdk onnxruntime pybullet httpx python-dotenv
 ```
 
-### 1. Test the contracts (real BLS12-381 pairing + real Poseidon Merkle)
+### 1. Test the contracts (real BLS12-381 + BN254 pairing, real Poseidon Merkle)
 ```bash
-cd contracts/verifier && cargo test        # genuine Groth16 proof passes, tampered fails
+cd contracts/verifier && cargo test         # genuine Groth16/BLS12-381 proof passes, tampered fails
+cd ../bn254_verifier && cargo test          # genuine Groth16/BN254 (Gnark) proof passes, tampered fails
 cd ../fleet_identity && cargo test          # real Poseidon Merkle membership + nullifier burn
 # Or run everything: bash run_tests.sh
 ```
@@ -123,6 +136,7 @@ cd ../fleet_identity && cargo test          # real Poseidon Merkle membership + 
 ./deploy.sh
 # Builds + deploys verifier/payment/reputation/insurance/fleet_identity,
 # writes IDs to deploy/contract_ids.env, prints stellar.expert links.
+# Also builds bn254_verifier's wasm (deploy separately once you have a real circuit VK).
 ```
 
 ### 3. Initialize the verifier
@@ -161,7 +175,8 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 | Proof System | RISC Zero zkVM | Program (AI inference) executed correctly |
 | ML Inference | ONNX Runtime (MobileNetV2) | The model run that produced the decision |
 | Proof wrapping | Groth16 over **BLS12-381** | Succinct, on-chain-verifiable proof |
-| On-chain verify | **Soroban native `pairing_check`** | Groth16 proof valid on Stellar |
+| On-chain verify (inference) | **Soroban native `pairing_check`** (BLS12-381, CAP-0059) | Groth16 proof valid on Stellar |
+| On-chain verify (generic) | **Soroban native `pairing_check`** (BN254, CAP-0074) | Reusable Groth16/BN254 verifier for fleet-membership circuits and RISC Zero receipts |
 | Fleet identity | **Poseidon Merkle tree (BN254 field)** | A licensed robot acted, without revealing which |
 | Replay safety | **One-time Poseidon nullifiers** | The same robot can't double-claim a task |
 
@@ -170,10 +185,12 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 > BLS12-381 (`pairing_check`, CAP-0059) **and** BN254 G1 ops + pairing (CAP-0074),
 > plus native **Poseidon/Poseidon2** hashing (CAP-0075). ZeroSense uses each where
 > it fits: the Groth16 **inference verifier runs on BLS12-381** (mature, audited
-> host path), while **zk-Fleet Identity uses BN254-field Poseidon** so its Merkle
+> host path), **zk-Fleet Identity uses BN254-field Poseidon** so its Merkle
 > commitments and nullifiers are circomlib-compatible with the standard off-chain
-> proving toolchain. Public-input field elements are reduced mod the respective
-> scalar field in-circuit.
+> proving toolchain, and `bn254_verifier` gives the fleet-membership circuit (and
+> any future BN254-proof circuit) its own native, real-proof-tested on-chain
+> verifier. Public-input field elements are reduced mod the respective scalar
+> field in-circuit.
 
 ---
 
@@ -197,6 +214,7 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 |---|---|
 | ZK proof of robot AI inference verified on-chain on Stellar | First we know of |
 | Anonymous-but-accountable robot fleet identity (Poseidon Merkle + nullifiers) on Stellar | First we know of |
+| Generic, real-proof-tested native BN254 Groth16 verifier reused across ML-inference and fleet-identity circuits | First we know of |
 | Autonomous XLM payment gated on an on-chain-verified proof | First we know of |
 | ZK anomaly kill-switch for robots | First we know of |
 
