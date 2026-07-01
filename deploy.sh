@@ -96,6 +96,22 @@ echo "==> Deploying fleet_identity ($FI_WASM) admin=$ADMIN_ADDR depth=$FLEET_DEP
 FI_ID="$(stellar contract deploy --wasm "$FI_WASM" --source "$IDENTITY" --network "$NETWORK" -- --admin "$ADMIN_ADDR" --depth "$FLEET_DEPTH")"
 record_id "fleet_identity" "$FI_ID"
 
+# ---- 2c. Build (but do not deploy) bn254_verifier ---------------------------
+# bn254_verifier's constructor takes (admin, verification_key), where
+# verification_key is a real Groth16 VK for a *specific* circuit (alpha/beta/
+# gamma/delta G1/G2 points + IC vector). We only build the wasm here; the
+# actual deploy is a separate, deliberate step run once
+# circuits/fleet_membership.circom has gone through a real trusted setup and
+# exported a verification_key.json (see contracts/bn254_verifier/tests/data/
+# gnark/verification_key.json for the expected shape). Deploying with a
+# placeholder/fake VK would silently make verify_proof meaningless, so this
+# script intentionally does not fabricate one.
+build_one "bn254_verifier"
+echo "==> bn254_verifier built. Deploy separately once you have a real circuit VK:"
+echo "    stellar contract deploy --wasm \$(contracts/bn254_verifier wasm) \\"
+echo "      --source $IDENTITY --network $NETWORK -- \\"
+echo "      --admin $ADMIN_ADDR --verification_key <VK_FROM_TRUSTED_SETUP>"
+
 # ---- 3. Next steps ----------------------------------------------------------
 echo ""
 echo "================================================================="
