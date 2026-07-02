@@ -1,6 +1,7 @@
 /* ========================================================================
    ZeroSense — Landing Page Interactions
-   Tab switching · Scroll reveal · FAQ accordion · Live proof feed
+   Tab switching · Scroll reveal · Animated counters (spade.com style)
+   Kinetic tagline · FAQ accordion · Live proof feed
    ======================================================================== */
 
 /* ─── Pipeline tab switching ──────────────────────────────── */
@@ -21,6 +22,55 @@ function animateSteps(panel) {
 const io = new IntersectionObserver((entries) => {
   entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
 }, { threshold: 0.12 });
+
+/* ─── Animated counters (spade.com "0% → 95%" count-up-on-scroll) ─────── */
+function animateCounter(el) {
+  const target = parseFloat(el.dataset.target);
+  if (Number.isNaN(target)) return;
+  const decimals = parseInt(el.dataset.decimals || '0', 10);
+  const prefix = el.dataset.prefix || '';
+  const suffix = el.dataset.suffix || '';
+  const duration = 1300;
+  const startTime = performance.now();
+
+  function tick(now) {
+    const p = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // ease-out-cubic, matches spade.com's snappy count-up
+    const val = target * eased;
+    el.textContent = prefix + val.toFixed(decimals) + suffix;
+    if (p < 1) requestAnimationFrame(tick);
+    else el.textContent = prefix + target.toFixed(decimals) + suffix;
+  }
+  requestAnimationFrame(tick);
+}
+
+const counterIo = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { animateCounter(e.target); counterIo.unobserve(e.target); }
+  });
+}, { threshold: 0.4 });
+
+/* ─── Kinetic tagline (spade.com "e v e r y l a y e r" spreading text) ── */
+function makeKinetic(el) {
+  const text = el.textContent;
+  el.textContent = '';
+  const spans = [];
+  for (const ch of text) {
+    const span = document.createElement('span');
+    span.textContent = ch === ' ' ? '\u00A0' : ch;
+    el.appendChild(span);
+    spans.push(span);
+  }
+  const kineticIo = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        spans.forEach((s, i) => setTimeout(() => { s.style.marginRight = '3px'; }, i * 16));
+        kineticIo.unobserve(el);
+      }
+    });
+  }, { threshold: 0.6 });
+  kineticIo.observe(el);
+}
 
 /* ─── FAQ accordion ──────────────────────────────────── */
 function toggleFaq(btn) {
@@ -88,11 +138,6 @@ function pushLog(robot, action, conf) {
   const log = document.getElementById('terminalLog');
   if (!log) return;
   const t = new Date().toLocaleTimeString('en-US', { hour12: false });
-  const lines = [
-    ['log-dim', '[' + t + ']'],
-    ['log-blue', 'PROOF'],
-    ['log-green', robot + ' → ' + action.label + ' (' + conf + '%)'],
-  ];
   const row = document.createElement('div');
   row.className = 'log-line';
   row.innerHTML =
@@ -108,6 +153,9 @@ function pushLog(robot, action, conf) {
 /* ─── Init ────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  document.querySelectorAll('[data-target]').forEach(el => counterIo.observe(el));
+  document.querySelectorAll('.kinetic-text').forEach(el => makeKinetic(el));
+
   const firstPanel = document.getElementById('panel-0');
   if (firstPanel) animateSteps(firstPanel);
   if (document.getElementById('proofFeed')) {
