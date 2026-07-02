@@ -24,7 +24,9 @@ OUT_DIR="deploy"
 DEPLOY_LOG="$OUT_DIR/contract_ids.env"
 
 # Contracts with a plain (no-arg) deploy; constructor-arg contracts handled below.
-CONTRACTS=(verifier payment reputation insurance)
+# `consensus` (zk-Swarm Consensus) is plain-deploy too: its `initialize(admin,
+# verifier)` is a normal post-deploy call, same as verifier/payment.
+CONTRACTS=(verifier payment reputation insurance consensus)
 
 mkdir -p "$OUT_DIR"
 : > "$DEPLOY_LOG"
@@ -150,3 +152,9 @@ echo "Then enroll a robot identity into the fleet (admin-only):"
 echo "  stellar contract invoke --id \"\$FLEET_IDENTITY_CONTRACT_ID\" \\"
 echo "    --source $IDENTITY --network $NETWORK -- \\"
 echo "    register_robot --commitment <POSEIDON_COMMITMENT_U256>"
+echo ""
+echo "Then wire zk-Swarm Consensus to the verifier (any high-value action can"
+echo "now require M-of-N independently ZK-verified robot witnesses):"
+echo "  stellar contract invoke --id \"\$CONSENSUS_CONTRACT_ID\" \\"
+echo "    --source $IDENTITY --network $NETWORK -- \\"
+echo "    initialize --admin $ADMIN_ADDR --verifier \"\$VERIFIER_CONTRACT_ID\""
