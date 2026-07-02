@@ -2,6 +2,8 @@
 
 Uses FastAPI TestClient — no server startup needed.
 """
+import hashlib
+
 import pytest
 from fastapi.testclient import TestClient
 from api.main import app
@@ -98,21 +100,49 @@ class TestInsurance:
 
 
 # ── Robot Identity ──
+# SECURITY (M2 fix): the API now only accepts a pre-computed on-device SHA256
+# commitment — never the raw sensor noise sample. `_commitment()` here stands
+# in for the hashing a robot's firmware would do locally before ever calling
+# the endpoint (see `reference_ondevice_commitment_example` in api/main.py).
 class TestIdentity:
+    @staticmethod
+    def _commitment(seed: str) -> str:
+        return hashlib.sha256(seed.encode()).hexdigest()
+
     def test_200(self, c):
         r = c.post("/robot/register-identity", json={
-            "robot_id":"robot-001","sensor_noise_sample":[0.01]*64
+            "robot_id": "robot-001",
+            "fingerprint_commitment": self._commitment("robot-001-noise"),
         })
         assert r.status_code == 200
+
     def test_has_identity_hash(self, c):
         r = c.post("/robot/register-identity", json={
-            "robot_id":"robot-002","sensor_noise_sample":[0.02]*64
+            "robot_id": "robot-002",
+            "fingerprint_commitment": self._commitment("robot-002-noise"),
         })
         assert len(r.json()["identity_hash"]) == 64
+
     def test_different_robots_different_hashes(self, c):
-        r1 = c.post("/robot/register-identity", json={"robot_id":"rA","sensor_noise_sample":[0.01]*64})
-        r2 = c.post("/robot/register-identity", json={"robot_id":"rB","sensor_noise_sample":[0.99]*64})
+        r1 = c.post("/robot/register-identity", json={
+            "robot_id": "rA", "fingerprint_commitment": self._commitment("noise-a"),
+        })
+        r2 = c.post("/robot/register-identity", json={
+            "robot_id": "rB", "fingerprint_commitment": self._commitment("noise-b"),
+        })
         assert r1.json()["identity_hash"] != r2.json()["identity_hash"]
+
+    def test_rejects_malformed_commitment(self, c):
+        r = c.post("/robot/register-identity", json={
+            "robot_id": "rC", "fingerprint_commitment": "not-a-valid-hex-digest",
+        })
+        assert r.status_code == 400
+
+    def test_rejects_wrong_length_commitment(self, c):
+        r = c.post("/robot/register-identity", json={
+            "robot_id": "rD", "fingerprint_commitment": "ab" * 10,
+        })
+        assert r.status_code == 400
 
 
 # ── Robot Status + Fleet ──
