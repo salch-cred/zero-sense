@@ -112,6 +112,23 @@ echo "    stellar contract deploy --wasm \$(contracts/bn254_verifier wasm) \\"
 echo "      --source $IDENTITY --network $NETWORK -- \\"
 echo "      --admin $ADMIN_ADDR --verification_key <VK_FROM_TRUSTED_SETUP>"
 
+# ---- 2d. Build (but do not deploy) fleet_learning ---------------------------
+# fleet_learning's constructor takes (admin, verifier, reward_token,
+# reward_per_contributor). `verifier` must be a *deployed* bn254_verifier
+# instance already configured with circuits/fedavg_aggregation.circom's real
+# verification key (see 2c above) — finalize_round is load-bearing against
+# it, so deploying fleet_learning before that verifier exists would only
+# produce a coordinator that can never finalize a round. We build the wasm
+# here so it's ready the moment a real verifier + circuit VK exist.
+build_one "fleet_learning"
+echo "==> fleet_learning built. Deploy once bn254_verifier is live with the"
+echo "    fedavg_aggregation circuit's VK, and you have a reward token (e.g."
+echo "    the native XLM Stellar Asset Contract):"
+echo "    stellar contract deploy --wasm \$(contracts/fleet_learning wasm) \\"
+echo "      --source $IDENTITY --network $NETWORK -- \\"
+echo "      --admin $ADMIN_ADDR --verifier <BN254_VERIFIER_CONTRACT_ID> \\"
+echo "      --reward_token <XLM_SAC_CONTRACT_ID> --reward_per_contributor <STROOPS>"
+
 # ---- 3. Next steps ----------------------------------------------------------
 echo ""
 echo "================================================================="
