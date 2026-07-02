@@ -5,7 +5,8 @@ Endpoints:
   POST /verify-proof            - Submit proof to Stellar Soroban verifier
   POST /claim-payment           - Trigger XLM payment after verified proof
   POST /file-insurance-claim    - File insurance claim with ZK evidence
-  POST /robot/register-identity - Register ZK biometric robot identity
+  POST /robot/register-identity - Register robot hardware identity from an
+                                   on-device commitment hash (see SECURITY note)
   GET  /robot/{id}/status       - Robot status, reputation, payment history
   GET  /fleet/report            - Full fleet analytics
   POST /guardian/start          - Start autonomous Guardian agent system
@@ -17,6 +18,9 @@ SECURITY
   - Money-moving / state-changing endpoints require an X-API-Key header that
     matches ZEROSENSE_API_KEY when that env var is set. If it is unset the
     check is skipped (dev mode) — set it in any real deployment.
+  - /robot/register-identity accepts only a pre-computed SHA256 commitment
+    hash. It never accepts or sees the robot's raw sensor noise sample — that
+    hashing must happen ON the robot, not on this server (see M2 fix below).
 """
 
 import hashlib
@@ -103,7 +107,10 @@ class InsuranceClaimRequest(BaseModel):
 
 class RegisterIdentityRequest(BaseModel):
     robot_id: str
-    sensor_noise_sample: list[float]
+    # SHA256 hex digest computed ON THE ROBOT from its PRNU sensor-noise
+    # sample plus a locally-held salt. The raw noise sample itself must never
+    # be sent to this API — see SECURITY note on the endpoint below (M2 fix).
+    fingerprint_commitment: str
 
 class ProofResponse(BaseModel):
     task_id: str
@@ -227,16 +234,40 @@ async def file_insurance_claim(req: InsuranceClaimRequest):
 
 @app.post("/robot/register-identity", dependencies=[Depends(require_api_key)])
 async def register_robot_identity(req: RegisterIdentityRequest):
-    """Register robot ZK biometric identity (hardware sensor noise fingerprint)."""
-    fingerprint_hash = _compute_prnu_fingerprint(req.sensor_noise_sample)
-    tx = await stellar_client.mint_soulbound_identity_token(
-        req.robot_id, fingerprint_hash
-    )
+    """Register robot hardware identity from an on-device commitment.
+
+    SECURITY (M2 fix): earlier versions of this endpoint accepted the raw
+    `sensor_noise_sample` and hashed it here, server-side — meaning the raw
+    PRNU noise sample crossed the network and was visible to this server, so
+    the feature was not actually zero-knowledge despite being labeled that
+    way. This endpoint now only accepts a pre-computed SHA256 commitment
+    (`fingerprint_commitment`) that the robot must compute ON-DEVICE from its
+    own noise sample plus a locally-held salt. The server never sees, stores,
+    or has any way to reconstruct the raw sensor data — it only anchors the
+    commitment hash on-chain as a soulbound identity token. See
+    `reference_ondevice_commitment_example()` below for the exact hashing a
+    robot's firmware should perform before calling this endpoint.
+    """
+    commitment = req.fingerprint_commitment.strip().lower()
+    if len(commitment) != 64:
+        raise HTTPException(
+            status_code=400,
+            detail="fingerprint_commitment must be a 64-character hex SHA256 digest computed on-device",
+        )
+    try:
+        int(commitment, 16)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="fingerprint_commitment must be a 64-character hex SHA256 digest computed on-device",
+        )
+
+    tx = await stellar_client.mint_soulbound_identity_token(req.robot_id, commitment)
     return {
         "robot_id": req.robot_id,
-        "identity_hash": fingerprint_hash,
+        "identity_hash": commitment,
         "soulbound_token_tx": tx,
-        "note": "ZK hardware fingerprint — cryptographically unforgeable identity",
+        "note": "Commitment computed on-device — raw sensor noise never left the robot",
     }
 
 
@@ -338,9 +369,16 @@ async def _auto_trigger_payment(task_id: str, confidence: int):
         print(f"[AutoPay] ❌ Payment failed for task {task_id}: {e}")
 
 
-def _compute_prnu_fingerprint(noise_sample: list[float]) -> str:
-    """Compute PRNU hardware fingerprint from sensor noise."""
-    data = bytes([int(abs(x) * 255) % 256 for x in noise_sample])
+def reference_ondevice_commitment_example(noise_sample: list[float], device_salt: bytes = b"") -> str:
+    """Reference implementation of the ON-DEVICE commitment hashing.
+
+    This function is NOT called by the server — it exists purely as a
+    documented reference for robot firmware authors, and so integration
+    tests can construct valid commitments without duplicating the hashing
+    logic. Real firmware should run the equivalent of this on-device and only
+    ever transmit the resulting hex digest to `/robot/register-identity`.
+    """
+    data = bytes([int(abs(x) * 255) % 256 for x in noise_sample]) + device_salt
     return hashlib.sha256(data).hexdigest()
 
 
