@@ -27,6 +27,18 @@ ACTION_LABELS = {
     2: "incident",
 }
 
+# Maps ONNX Runtime's reported input `.type` string to the numpy dtype that
+# must be fed into session.run(). Getting this wrong raises
+# `INVALID_ARGUMENT: Unexpected input data type` at inference time.
+_ONNX_TYPE_TO_NUMPY = {
+    "tensor(float)": np.float32,
+    "tensor(double)": np.float64,
+    "tensor(uint8)": np.uint8,
+    "tensor(int8)": np.int8,
+    "tensor(int32)": np.int32,
+    "tensor(int64)": np.int64,
+}
+
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
     """Numerically stable softmax.
@@ -101,25 +113,42 @@ class RobotInferenceEngine:
         return action, confidence, input_hash
 
     def _run_onnx(self, frames: list[list[float]]) -> tuple[int, int]:
-        """Run actual MobileNetV2 ONNX inference."""
-        # Prepare input: resize to 224x224x3
+        """Run actual MobileNetV2 ONNX inference.
+
+        SECURITY/CORRECTNESS (M3 fix): earlier code always cast the input
+        tensor to float32, regardless of what the loaded ONNX graph actually
+        declared. A genuinely INT8-quantized model (QOperator format, with
+        QuantizeLinear/DequantizeLinear baked into the graph) declares
+        uint8/int8 inputs — feeding it float32 raises
+        `INVALID_ARGUMENT: Unexpected input data type` at inference time. The
+        dtype is now read from the model's own input metadata and the tensor
+        is cast (and, for integer types, rescaled from [0,1] floats into the
+        integer's value range) to match, so this works correctly whether the
+        exported model is float32 or genuinely INT8-quantized.
+        """
         if not frames or not frames[0]:
             return 2, 0
 
-        # Flatten and reshape sensor data to model input format
-        flat = np.array(frames[0], dtype=np.float32)
-        # Pad or trim to 224*224*3 = 150528
+        flat = np.array(frames[0], dtype=np.float64)
         target_size = 224 * 224 * 3
         if len(flat) < target_size:
             flat = np.pad(flat, (0, target_size - len(flat)))
         else:
             flat = flat[:target_size]
 
-        input_tensor = flat.reshape(1, 3, 224, 224)
-        input_name = self.session.get_inputs()[0].name
+        input_meta = self.session.get_inputs()[0]
+        input_name = input_meta.name
+        onnx_dtype = _ONNX_TYPE_TO_NUMPY.get(input_meta.type, np.float32)
+
+        if onnx_dtype in (np.uint8, np.int8):
+            # Quantized models expect pixel-range integers, not [0,1] floats.
+            info = np.iinfo(onnx_dtype)
+            flat = np.clip(flat * 255.0, info.min, info.max)
+
+        input_tensor = flat.astype(onnx_dtype).reshape(1, 3, 224, 224)
         outputs = self.session.run(None, {input_name: input_tensor})
 
-        logits = outputs[0][0]
+        logits = outputs[0][0].astype(np.float64)
         probs = _softmax(logits)
         predicted_class = int(np.argmax(probs))
         confidence = int(np.max(probs) * 100)
