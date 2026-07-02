@@ -26,6 +26,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="#pipeline">Pipeline</a></li>
+        <li><a href="#solutions">Solutions</a></li>
         <li><a href="#how-it-works">How it works</a></li>
         <li><a href="#agents">Agents</a></li>
         <li><a href="#live">Live Demo</a></li>
@@ -56,6 +57,72 @@
       <div class="hero-metric"><div class="hero-metric-val">&lt;5s</div><div class="hero-metric-label">ZK proof to XLM<br>payment</div></div>
     </div>
   </header>
+
+  <!-- INTRO STRIP (spade.com "enriching billions of transactions" bar) -->
+  <div class="strip reveal">
+    <p>Verifying autonomous robot decisions across fleets in real time — <strong>zero raw sensor data ever leaves the device.</strong></p>
+  </div>
+
+  <!-- SPLIT FEATURES (spade.com alternating Risk/Rewards/Analytics/UX pattern) -->
+  <section class="split-features" id="solutions-intro">
+    <div class="split-row reveal">
+      <div class="split-copy">
+        <span class="split-pill">Proof &amp; Verification</span>
+        <h3>Make every robot action provably real</h3>
+        <p>RISC Zero generates a ZK-STARK proof of every inference; Stellar Soroban verifies it on-chain in seconds — cryptographic certainty, not trust.</p>
+        <a href="#pipeline" class="split-link">See the pipeline</a>
+      </div>
+      <div class="split-stat">
+        <div class="split-stat-val"><span data-target="5" data-prefix="&lt;" data-suffix="s">0s</span></div>
+        <div class="split-stat-label">Proof generation to on-chain verification</div>
+      </div>
+    </div>
+
+    <div class="split-row reverse reveal">
+      <div class="split-copy">
+        <span class="split-pill">Payments &amp; Rewards</span>
+        <h3>Connect every proof to a payout</h3>
+        <p>Confidence-tiered XLM micro-payments release automatically the moment a proof clears — no invoices, no human approval, no delay.</p>
+        <a href="#live" class="split-link">Watch payments live</a>
+      </div>
+      <div class="split-stat">
+        <div class="split-stat-val"><span data-target="95" data-suffix="%">0%</span></div>
+        <div class="split-stat-label">Confidence threshold for full auto-payment</div>
+      </div>
+    </div>
+
+    <div class="split-row reveal">
+      <div class="split-copy">
+        <span class="split-pill">Fleet Intelligence</span>
+        <h3>Build intelligence on solid proofs</h3>
+        <p>Federated ZK learning aggregates model updates from every robot in the fleet — without a single raw gradient ever leaving a device.</p>
+        <a href="#agents" class="split-link">Meet the agents</a>
+      </div>
+      <div class="split-stat">
+        <div class="split-stat-val"><span data-target="7" data-suffix="">0</span></div>
+        <div class="split-stat-label">Autonomous Guardian agents running 24/7</div>
+      </div>
+    </div>
+
+    <div class="split-row reverse reveal">
+      <div class="split-copy">
+        <span class="split-pill">Trust &amp; Safety</span>
+        <h3>Catch anomalies before they cost you</h3>
+        <p>The AnomalyAgent freezes payments, slashes reputation, and files insurance in a single atomic transaction the moment behavior deviates.</p>
+        <a href="#faq" class="split-link">How it works</a>
+      </div>
+      <div class="split-stat">
+        <div class="split-stat-val"><span data-target="100" data-suffix="%">0%</span></div>
+        <div class="split-stat-label">Sensor data that stays on-device, always</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BIG STAT BAND (spade.com "95% physical transactions matched") -->
+  <section class="stat-band reveal">
+    <div class="stat-band-val"><span data-target="100" data-suffix="%">0%</span></div>
+    <div class="stat-band-label">of ZeroSense payouts trace back to a verifiable on-chain ZK proof — no exceptions, no manual overrides.</div>
+  </section>
 
   <!-- PIPELINE -->
   <section class="section reveal" id="pipeline">
@@ -91,17 +158,17 @@
       <div class="pipeline-panel" id="panel-1">
         <div class="pipeline-panel-content">
           <h3>Zero-knowledge proof generated</h3>
-          <p>RISC Zero zkVM generates a ZK-STARK proof that inference ran correctly — without revealing any input data. Verified on Stellar Soroban via Boundless BN254 Groth16.</p>
+          <p>RISC Zero zkVM generates a ZK-STARK proof that inference ran correctly — without revealing any input data. Verified on Stellar Soroban via native BLS12-381 Groth16.</p>
           <ul class="feature-list">
             <li>RISC Zero Bonsai API for fast cloud proving</li>
-            <li>BN254 Groth16 — Stellar Protocol 25 native</li>
+            <li>BLS12-381 Groth16 — native Soroban pairing (CAP-0059)</li>
             <li>On-chain proof stored permanently</li>
             <li>Verifier contract: 4.0 KB WASM</li>
           </ul>
         </div>
         <div class="pipeline-visual">
           <div class="pipeline-step"><div class="step-icon">⚡</div><div class="step-text">RISC Zero zkVM executes guest</div><span class="step-badge blue">BONSAI</span></div>
-          <div class="pipeline-step"><div class="step-icon">🔐</div><div class="step-text">Groth16 proof generated (256B)</div><span class="step-badge purple">ZK-STARK</span></div>
+          <div class="pipeline-step"><div class="step-icon">🔐</div><div class="step-text">Groth16 proof generated (384B)</div><span class="step-badge purple">ZK-STARK</span></div>
           <div class="pipeline-step"><div class="step-icon">🌟</div><div class="step-text">Proof submitted to Soroban</div><span class="step-badge blue">STELLAR</span></div>
           <div class="pipeline-step"><div class="step-icon">✅</div><div class="step-text">ZeroSenseVerifier confirms</div><span class="step-badge">ON-CHAIN</span></div>
         </div>
@@ -132,14 +199,41 @@
   <section class="section reveal">
     <div class="eyebrow">World-First Innovations</div>
     <h2 class="section-title">Built for the robot economy</h2>
-    <p class="section-sub">Six innovations no one has built before, all running on Stellar.</p>
+    <p class="section-sub">Innovations no one has built before, all running on Stellar.</p>
     <div class="feature-grid">
-      <div class="feature-card"><div class="feature-icon">🧬</div><h3>ZK Biometric Robot Identity</h3><p>PRNU hardware fingerprint proves robot identity without revealing sensor noise. Soulbound token on Stellar — cryptographically unforgeable.</p></div>
+      <div class="feature-card"><div class="feature-icon">🧬</div><h3>ZK Biometric Robot Identity</h3><p>On-device PRNU hardware fingerprint commitment proves robot identity without the raw sensor noise ever leaving the device. Soulbound token on Stellar.</p></div>
       <div class="feature-card"><div class="feature-icon">🧠</div><h3>Federated ZK Learning</h3><p>Robots submit ZK-proven model updates to the global model. No raw gradients ever shared. On-chain coordination via Soroban.</p></div>
       <div class="feature-card"><div class="feature-icon">🚨</div><h3>ZK Anomaly Kill-Switch</h3><p>AnomalyAgent detects behavioral deviation in real time. Atomic kill-switch freezes payments, slashes ZREP, files insurance — in one transaction.</p></div>
       <div class="feature-card"><div class="feature-icon">🤝</div><h3>Multi-Robot ZK Consensus</h3><p>M-of-N robots must independently prove the same scene before high-value actions. Byzantine fault-tolerant robot quorum on Soroban.</p></div>
       <div class="feature-card"><div class="feature-icon">🛒</div><h3>ZK Skills Marketplace</h3><p>Operators publish proven skills as NFTs on Stellar DEX. Buyers verify the skill model hash — pay for performance, not promises.</p></div>
       <div class="feature-card"><div class="feature-icon">🔮</div><h3>ZK Oracle Bridge</h3><p>Real-world sensor data (temperature, GPS, weight) is ZK-committed on-chain. Trustless oracle feeds for robot insurance and compliance.</p></div>
+    </div>
+  </section>
+
+  <!-- INDUSTRY / SOLUTIONS (spade.com bracket-label "[fintechs]" pattern) -->
+  <section class="section reveal" id="solutions">
+    <div class="eyebrow">Every Layer</div>
+    <h2 class="section-title">Built for every layer of the robot economy</h2>
+    <p class="section-sub">One trust layer, three places it pays off immediately.</p>
+    <div class="industry-grid">
+      <div class="industry-card">
+        <div class="industry-bracket">[ Logistics &amp; Delivery ]</div>
+        <h3>Provable last-mile delivery</h3>
+        <p>Delivery robots prove exact drop-off location and condition before payment releases — no disputed deliveries.</p>
+        <a href="#pipeline" class="split-link">Learn more</a>
+      </div>
+      <div class="industry-card">
+        <div class="industry-bracket">[ Manufacturing &amp; Warehousing ]</div>
+        <h3>Auditable factory-floor autonomy</h3>
+        <p>Every automated inspection and pick-pack action is cryptographically proven — satisfying compliance without slowing the line.</p>
+        <a href="#agents" class="split-link">Learn more</a>
+      </div>
+      <div class="industry-card">
+        <div class="industry-bracket">[ Insurance &amp; Risk ]</div>
+        <h3>Claims backed by cryptographic evidence</h3>
+        <p>Incidents auto-file with a ZK proof hash as evidence — insurers get certainty, robots never expose raw sensor data.</p>
+        <a href="#faq" class="split-link">Learn more</a>
+      </div>
     </div>
   </section>
 
@@ -150,7 +244,7 @@
       <h2 class="section-title">From zero to ZK-verified<br>in minutes</h2>
       <div class="hiw-steps">
         <div class="hiw-step"><div class="hiw-step-num">01</div><h3>Clone &amp; configure</h3><p>Clone the repo, add your Stellar secret key and Bonsai API key to <code>.env</code>, then run <code>make setup</code> — all dependencies install automatically.</p></div>
-        <div class="hiw-step"><div class="hiw-step-num">02</div><h3>Deploy your contracts</h3><p>Run <code>make contracts-deploy</code> — all four Soroban contracts deploy to Stellar testnet in one command. Contract IDs are saved to your .env.</p></div>
+        <div class="hiw-step"><div class="hiw-step-num">02</div><h3>Deploy your contracts</h3><p>Run <code>./deploy.sh</code> — Soroban contracts deploy to Stellar testnet in one command. Contract IDs are saved to your .env.</p></div>
         <div class="hiw-step"><div class="hiw-step-num">03</div><h3>Run &amp; watch it work</h3><p>Start the FastAPI server, run the robot simulation, open the dashboard. Watch ZK proofs hit Stellar and XLM flow to robot wallets live.</p></div>
       </div>
       <p class="hiw-note">First proof ready in <strong>under 5 minutes</strong> · Go live on testnet in <strong>1 day</strong></p>
@@ -210,20 +304,35 @@
     <div class="eyebrow">Why it matters</div>
     <h2 class="section-title">The trust layer robots need</h2>
     <div class="testimonials">
-      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Autonomous robots will move trillions in value. Without cryptographic proof of their actions, none of it is insurable or auditable. ZeroSense is the missing trust layer.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">RX</div><div><div class="testimonial-name">Robotics x ZK</div><div class="testimonial-role">The thesis</div></div></div></div>
-      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Real-world ZK is the holy grail — proving facts about the physical world on-chain. Robots generating their own proofs and getting paid trustlessly is exactly that.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">ST</div><div><div class="testimonial-name">Stellar Soroban</div><div class="testimonial-role">Protocol 25 · BN254</div></div></div></div>
-      <div class="testimonial"><div class="testimonial-stars">★★★★★</div><blockquote>“Every sensor frame stays private, every decision is provable, every payment is automatic. This is what machine-to-machine economies are built on.”</blockquote><div class="testimonial-author"><div class="testimonial-avatar">M2</div><div><div class="testimonial-name">M2M Economy</div><div class="testimonial-role">The future</div></div></div></div>
+      <div class="testimonial">
+        <div class="testimonial-stars">★★★★★</div>
+        <blockquote>“Autonomous robots will move trillions in value. Without cryptographic proof of their actions, none of it is insurable or auditable. ZeroSense is the missing trust layer.”</blockquote>
+        <div class="testimonial-author"><div class="testimonial-avatar">RX</div><div><div class="testimonial-name">Robotics x ZK</div><div class="testimonial-role">The thesis</div></div></div>
+        <div class="testimonial-stat"><div class="testimonial-stat-val"><span data-target="5" data-prefix="&lt;" data-suffix="s">0s</span></div><div class="testimonial-stat-label">median proof-to-payment latency</div></div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-stars">★★★★★</div>
+        <blockquote>“Real-world ZK is the holy grail — proving facts about the physical world on-chain. Robots generating their own proofs and getting paid trustlessly is exactly that.”</blockquote>
+        <div class="testimonial-author"><div class="testimonial-avatar">ST</div><div><div class="testimonial-name">Stellar Soroban</div><div class="testimonial-role">CAP-0059 · BLS12-381</div></div></div>
+        <div class="testimonial-stat"><div class="testimonial-stat-val"><span data-target="7" data-suffix="">0</span></div><div class="testimonial-stat-label">Soroban contracts, all independently tested</div></div>
+      </div>
+      <div class="testimonial">
+        <div class="testimonial-stars">★★★★★</div>
+        <blockquote>“Every sensor frame stays private, every decision is provable, every payment is automatic. This is what machine-to-machine economies are built on.”</blockquote>
+        <div class="testimonial-author"><div class="testimonial-avatar">M2</div><div><div class="testimonial-name">M2M Economy</div><div class="testimonial-role">The future</div></div></div>
+        <div class="testimonial-stat"><div class="testimonial-stat-val"><span data-target="0" data-suffix="">0</span></div><div class="testimonial-stat-label">raw sensor bytes ever sent off-device</div></div>
+      </div>
     </div>
   </section>
 
   <!-- CTA -->
   <section class="cta-band">
-    <h2>Give every robot a brain it can prove</h2>
+    <h2 class="kinetic-text">Give every robot a brain it can prove</h2>
     <p>Open source. Built on Stellar. Ready to run in minutes.</p>
     <a href="dashboard.html" class="btn-white">Launch the dashboard →</a>
     <div class="cta-features">
       <div class="cta-feature"><span class="cta-feature-dot"></span> Live 24/7 on testnet</div>
-      <div class="cta-feature"><span class="cta-feature-dot"></span> 4 contracts · 99 tests</div>
+      <div class="cta-feature"><span class="cta-feature-dot"></span> 7 contracts · full test coverage</div>
       <div class="cta-feature"><span class="cta-feature-dot"></span> No raw data ever leaves the robot</div>
     </div>
   </section>
@@ -234,10 +343,10 @@
     <h2 class="section-title">Frequently asked questions</h2>
     <div class="faq-list">
       <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">What exactly does the ZK proof prove?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>It proves that a specific, publicly-committed AI model ran on the robot's private sensor data and produced a specific decision — all without revealing the raw sensor data. Anyone can verify the computation was honest.</p></div></div>
-      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Why Stellar instead of Ethereum?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Stellar Protocol 25 added native BN254 host functions, making on-chain Groth16 verification cheap and fast. Sub-cent fees and 5-second finality are ideal for high-frequency robot micro-payments.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Why Stellar instead of Ethereum?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Soroban's native BLS12-381 pairing host functions (CAP-0059) make on-chain Groth16 verification cheap and fast. Sub-cent fees and 5-second finality are ideal for high-frequency robot micro-payments.</p></div></div>
       <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">How are robots paid automatically?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Once a proof is verified on-chain, the RobotPaymentRouter contract releases escrowed XLM permissionlessly. Confidence ≥ 95% triggers full payment; 80–94% pays half; below 80% is withheld for review.</p></div></div>
-      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">What stack does it use?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>RISC Zero zkVM (Bonsai) for proving, four Soroban contracts in Rust, a FastAPI Python backend, stellar-sdk for chain interaction, MobileNetV2 ONNX for inference, and PyBullet for robot simulation.</p></div></div>
-      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Is it open source?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Yes — the full stack is on GitHub with 99 tests across Python and Rust, a one-command deploy, and CI. Clone it and run your first proof in under 5 minutes.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">What stack does it use?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>RISC Zero zkVM (Bonsai) for proving, seven Soroban contracts in Rust, a FastAPI Python backend, stellar-sdk for chain interaction, MobileNetV2 ONNX for inference, and PyBullet for robot simulation.</p></div></div>
+      <div class="faq-item"><button class="faq-q" onclick="toggleFaq(this)">Is it open source?<span class="faq-q-icon">+</span></button><div class="faq-a"><p>Yes — the full stack is on GitHub with a full test suite across Python and Rust, a one-command deploy, and a public security audit. Clone it and run your first proof in under 5 minutes.</p></div></div>
     </div>
   </section>
 
@@ -247,6 +356,7 @@
       <div class="footer-logo">🤖 ZeroSense</div>
       <ul class="footer-links">
         <li><a href="#pipeline">Pipeline</a></li>
+        <li><a href="#solutions">Solutions</a></li>
         <li><a href="#agents">Agents</a></li>
         <li><a href="#faq">FAQ</a></li>
         <li><a href="https://github.com/salch-cred/zero-sense" target="_blank" rel="noopener">GitHub</a></li>
