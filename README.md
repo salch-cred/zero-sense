@@ -17,6 +17,7 @@ Billions of dollars of autonomous robots operate daily. When a robot completes a
 - Employers **cannot pay robots** based on verifiable task completion
 - Fleets **cannot prove a licensed robot acted** without doxxing the whole fleet roster
 - Regulatory bodies **cannot audit** robot decisions without full data exposure
+- Fleets that **learn together cannot prove the shared model wasn't tampered with** during aggregation
 
 ## 💡 The Solution
 
@@ -33,6 +34,9 @@ zk-Fleet Identity  ← anonymous-but-accountable: proves a licensed robot acted,
       ↓               burns a one-time nullifier (no double-spend, no doxxing)
 Auto XLM Payment + ZREP Token + Insurance Claim
       ↓
+zk-FedAvg Fleet Learning  ← ZK-proves the shared model update really is the
+      ↓                      claimed weighted average of every robot's local
+      ↓                      training round — then auto-pays each contributor
 ZeroSense Guardian (7 Autonomous Agents)
 ```
 
@@ -52,12 +56,28 @@ This is the missing accountability layer for the robot economy: **anonymous, unl
 
 ### The ZK backbone: `contracts/bn254_verifier`
 
-A generic, circuit-agnostic Groth16-over-**BN254** verifier using Stellar's native Protocol 25 host functions (`g1_add`, `g1_mul`, `pairing_check` — CAP-0074). It's the reusable on-chain building block for two upgrades:
+A generic, circuit-agnostic Groth16-over-**BN254** verifier using Stellar's native Protocol 25 host functions (`g1_add`, `g1_mul`, `pairing_check` — CAP-0074). It's the reusable on-chain building block for two upgrades, and now backs a third feature outright:
 
 1. **Fully zero-knowledge fleet membership** — once `circuits/fleet_membership.circom` (Poseidon Merkle inclusion) goes through a trusted setup, `fleet_identity` calls this verifier instead of checking the Merkle path transparently, so a robot proves membership *without revealing the path at all*.
 2. **Native BN254 verification of RISC Zero receipts** wrapped as Groth16/BN254 proofs — an alternative to the BLS12-381 path for cheaper on-chain verification.
+3. **zk-FedAvg Fleet Learning** (`contracts/fleet_learning`, see below) — verifies that a federated-learning aggregation round was computed correctly, before any reward pays out.
 
 Its test suite verifies a **real Gnark-generated Groth16/BN254 proof** end-to-end through the actual Soroban `pairing_check` host function — not a mock, not a stub.
+
+---
+
+## 🆕 World-First #2: zk-FedAvg Fleet Learning
+
+`contracts/fleet_learning` answers a question we could not find *any* prior project — academic or shipped — answering together: **"prove a robot fleet's shared model update really is the correct weighted average of every robot's local training, and autonomously pay every verified contributor in XLM the moment that's proven — on Stellar."**
+
+Most zero-knowledge federated learning (ZK-FL) research proves a *client's local training step* was executed correctly. The harder, less-explored half — flagged explicitly in the 2025 survey **"SoK: Verifiable Federated Learning"** (Bruschi et al., IACR ePrint 2025/2296) — is proving the **aggregation** itself wasn't tampered with. `fleet_learning` makes exactly that ZK-checked fact load-bearing, following the ZK-proved-FedAvg approach in **Xu et al. 2023** ("An efficient and privacy-preserving decentralized federated learning algorithm", arXiv:2312.04579) and **Jin et al. 2025** ("Zero-Knowledge Federated Learning", arXiv:2503.15550):
+
+- **Poseidon-committed local updates.** Each robot calls `submit_local_update` with a Poseidon commitment to its local model delta for a training round — one submission per robot per round.
+- **Contract-derived, not caller-supplied, binding root.** `finalize_round` recomputes `commitments_root` itself (a Poseidon left-fold over the on-chain-recorded commitments, specified exactly in `circuits/fedavg_aggregation.circom`) and feeds `[round, commitments_root, aggregated_hash]` to `bn254_verifier` as public signals. An aggregator cannot submit a valid-looking proof about a *different* set of contributions — the contract derives the root the proof is checked against, not the prover.
+- **One verifier, two circuits.** Reuses the same real-proof-tested `contracts/bn254_verifier` that backs zk-Fleet Identity.
+- **Autonomous settlement.** Once a round is finalized, every recorded contributor (and only recorded contributors, and only once) can `claim_reward` in XLM or any configured Stellar asset — no manual reconciliation, no operator discretion after the proof is checked.
+
+**Why this is a different trust model than prior blockchain+FL+robotics work:** Pacheco et al. (DARS 2024, "Securing Federated Learning in Robot Swarms using Blockchain") secure swarm FL with a **reputation-token economy** — good robots earn tokens, bad ones get slashed — but there is no cryptographic proof the aggregation arithmetic itself was correct. Existing ZK-FL *code* we found (`Veriblock-FL`, `fl-chain-data-sharing`) targets Ethereum and generic clients, not a physical robot fleet with on-chain identity and autonomous per-round Stellar payout. Combining ZK-proved FedAvg correctness + fleet-identity-style robot accounting + autonomous Stellar payment is, as far as our research could determine, unbuilt elsewhere.
 
 ---
 
@@ -70,20 +90,23 @@ Radical honesty — because "load-bearing ZK, actually verified on-chain" is the
 | **On-chain Groth16 verification (BLS12-381)** | ✅ **REAL** | `contracts/verifier` runs the full Groth16 equation via Soroban's native BLS12-381 `pairing_check` host function (CAP-0059). Not a stub. |
 | **On-chain Groth16 verification (BN254)** | ✅ **REAL** | `contracts/bn254_verifier` runs the same Groth16 equation via native BN254 `pairing_check` (CAP-0074). Tested against a real Gnark-generated proof + verification key, not synthetic data. |
 | **zk-Fleet Identity (Poseidon Merkle + nullifiers)** | ✅ **REAL** | `contracts/fleet_identity` builds an incremental Poseidon Merkle tree, rolling 32-root history, and a one-time nullifier set using native X-Ray Poseidon (CAP-0075). Self-contained tests run real on-chain Poseidon — no mocks. |
+| **zk-FedAvg Fleet Learning (coordinator + reward gating)** | ✅ **REAL** | `contracts/fleet_learning` records commitments, recomputes the Poseidon commitments-root on-chain, and cross-contract calls `bn254_verifier::verify_proof` — `finalize_round` cannot succeed without that call approving. Tested for submission gating, an independently-reconstructed Poseidon root, claim gating, and that finalize traps without a real verifier approval. |
 | **Verifier security model** | ✅ **REAL** | One-shot admin init, admin-only model registry, `robot.require_auth`, replay protection, public-input binding. Unit-tested. |
 | **Payment uses verified confidence** | ✅ **REAL** | `payment` reads confidence cross-contract from the verifier; never trusts a caller-supplied value. |
-| **Contract test suite** | ✅ **REAL** | Self-contained BLS12-381 pairing tests + real-Gnark BN254 pairing tests + real-Poseidon fleet-identity tests (membership, double-spend, unknown-root, tree-full) + Python API tests. |
-| **Testnet deployment** | ⚠️ **Run `./deploy.sh`** | Script deploys verifier/payment/reputation/insurance/fleet_identity and prints stellar.expert links. `bn254_verifier` is built by the same script but deployed separately once a real circuit VK exists (see below). Paste the resulting contract IDs below. |
+| **Contract test suite** | ✅ **REAL** | Self-contained BLS12-381 pairing tests + real-Gnark BN254 pairing tests + real-Poseidon fleet-identity tests (membership, double-spend, unknown-root, tree-full) + fleet-learning coordinator tests + Python API tests. |
+| **Testnet deployment** | ⚠️ **Run `./deploy.sh`** | Script deploys verifier/payment/reputation/insurance/fleet_identity and prints stellar.expert links. `bn254_verifier` and `fleet_learning` are built by the same script but deployed separately once a real circuit VK exists (see below). Paste the resulting contract IDs below. |
 | **Off-chain proving (RISC Zero / Bonsai)** | ⚠️ **Optional/mockable** | The pipeline can run with Bonsai, or with a mock prover for local demos. The on-chain check is identical either way. |
 | **Fleet-identity zero-knowledge upgrade** | ⚠️ **In progress** | Membership is currently a transparent on-chain Merkle check. The generic on-chain verifier it will call (`contracts/bn254_verifier`) is built and real-proof-tested; the `circuits/fleet_membership.circom` circuit, its trusted setup, and the `submit_action_zk` wiring into `fleet_identity` are the remaining steps. |
+| **Fleet-learning circuit (`fedavg_aggregation.circom`)** | ⚠️ **Design spec, not yet compiled** | The exact constraint system (commitment recomputation, Poseidon root fold, fixed-point FedAvg division, output hash binding) is fully specified and cited. Compiling it, running a trusted setup, and wiring a live prover is the remaining step before `finalize_round` can be called with a genuine proof — the on-chain consumer contract is already real and tested against that eventuality (see the row above). |
 | **Robot input (PyBullet sim)** | ⚠️ **Simulated** | Warehouse robot is a PyBullet simulation, not physical hardware. |
-| **Guardian agents** | ⚠️ **Partial** | Orchestration scaffolding; PaymentAgent path is wired end-to-end, others are in progress. |
+| **Guardian agents** | ⚠️ **Partial** | Orchestration scaffolding; PaymentAgent path is wired end-to-end, LearningAgent is now backed by a real on-chain contract (`fleet_learning`), others are in progress. |
 
 > **Deployed testnet contract IDs:** _run `./deploy.sh` and paste here_
 > - Verifier: `C...`  — https://stellar.expert/explorer/testnet/contract/C...
 > - Payment: `C...`
 > - Fleet Identity: `C...`
 > - BN254 Verifier: `C...` _(deploy once a real circuit VK exists — see `deploy.sh`)_
+> - Fleet Learning: `C...` _(deploy once BN254 Verifier is live with the fedavg_aggregation VK — see `deploy.sh`)_
 
 ---
 
@@ -95,9 +118,11 @@ zerosense/
 │   ├── verifier/        # ZeroSenseVerifier — REAL BLS12-381 Groth16 pairing_check
 │   ├── bn254_verifier/  # Generic Groth16-over-BN254 verifier — REAL, real-proof-tested
 │   ├── fleet_identity/  # zk-Fleet Identity — Poseidon Merkle tree + one-time nullifiers
+│   ├── fleet_learning/  # zk-FedAvg Fleet Learning — ZK-verified aggregation + auto rewards
 │   ├── payment/         # RobotPaymentRouter — auto XLM payment on verified proof
 │   ├── reputation/      # ZRepToken — robot reputation Stellar asset
 │   └── insurance/       # InsuranceClaim — ZK-evidence insurance
+├── circuits/            # Circom circuit design specs (fleet_membership, fedavg_aggregation)
 ├── zkvm/                # RISC Zero proof system (guest + Bonsai host)
 ├── api/                 # FastAPI Python backend (endpoints, agents, stellar sdk)
 ├── model/               # ONNX Runtime MobileNetV2 inference
@@ -128,6 +153,7 @@ pip install fastapi uvicorn stellar-sdk onnxruntime pybullet httpx python-dotenv
 cd contracts/verifier && cargo test         # genuine Groth16/BLS12-381 proof passes, tampered fails
 cd ../bn254_verifier && cargo test          # genuine Groth16/BN254 (Gnark) proof passes, tampered fails
 cd ../fleet_identity && cargo test          # real Poseidon Merkle membership + nullifier burn
+cd ../fleet_learning && cargo test          # submission gating, Poseidon root fold, claim gating
 # Or run everything: bash run_tests.sh
 ```
 
@@ -136,7 +162,8 @@ cd ../fleet_identity && cargo test          # real Poseidon Merkle membership + 
 ./deploy.sh
 # Builds + deploys verifier/payment/reputation/insurance/fleet_identity,
 # writes IDs to deploy/contract_ids.env, prints stellar.expert links.
-# Also builds bn254_verifier's wasm (deploy separately once you have a real circuit VK).
+# Also builds bn254_verifier and fleet_learning wasm (deploy both separately
+# once you have a real circuit VK — see deploy.sh's printed instructions).
 ```
 
 ### 3. Initialize the verifier
@@ -176,9 +203,10 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 | ML Inference | ONNX Runtime (MobileNetV2) | The model run that produced the decision |
 | Proof wrapping | Groth16 over **BLS12-381** | Succinct, on-chain-verifiable proof |
 | On-chain verify (inference) | **Soroban native `pairing_check`** (BLS12-381, CAP-0059) | Groth16 proof valid on Stellar |
-| On-chain verify (generic) | **Soroban native `pairing_check`** (BN254, CAP-0074) | Reusable Groth16/BN254 verifier for fleet-membership circuits and RISC Zero receipts |
+| On-chain verify (generic) | **Soroban native `pairing_check`** (BN254, CAP-0074) | Reusable Groth16/BN254 verifier for fleet-membership circuits, fleet-learning aggregation, and RISC Zero receipts |
 | Fleet identity | **Poseidon Merkle tree (BN254 field)** | A licensed robot acted, without revealing which |
 | Replay safety | **One-time Poseidon nullifiers** | The same robot can't double-claim a task |
+| Fleet learning | **ZK-proved FedAvg + Poseidon commitments-root** | The published shared model update is the correct weighted average of every robot's committed local update — not something the aggregator swapped in |
 
 > **On curves — BLS12-381 *and* BN254 are both native now.** As of **Protocol 25
 > “X-Ray”** (mainnet Jan 2026), Soroban exposes native host functions for *both*
@@ -187,10 +215,10 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 > it fits: the Groth16 **inference verifier runs on BLS12-381** (mature, audited
 > host path), **zk-Fleet Identity uses BN254-field Poseidon** so its Merkle
 > commitments and nullifiers are circomlib-compatible with the standard off-chain
-> proving toolchain, and `bn254_verifier` gives the fleet-membership circuit (and
-> any future BN254-proof circuit) its own native, real-proof-tested on-chain
-> verifier. Public-input field elements are reduced mod the respective scalar
-> field in-circuit.
+> proving toolchain, and `bn254_verifier` gives both the fleet-membership circuit
+> and the fleet-learning aggregation circuit their own native, real-proof-tested
+> on-chain verifier. Public-input field elements are reduced mod the respective
+> scalar field in-circuit.
 
 ---
 
@@ -202,7 +230,7 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 | AnomalyAgent | Kill-switch on behavioral deviation |
 | InsuranceAgent | Auto-files claims with ZK evidence |
 | ReputationAgent | Mints/slashes ZREP on Stellar |
-| LearningAgent | Aggregates federated model updates |
+| LearningAgent | Aggregates federated model updates — backed by `contracts/fleet_learning`: ZK-verifies aggregation correctness on-chain, then auto-pays every contributor in XLM |
 | OracleAgent | ZK-verified real-world data feeds |
 | AssistantAgent | LLM failure prediction + reporting |
 
@@ -214,7 +242,8 @@ open frontend/index.html               # live sim + proof visualizer + tx explor
 |---|---|
 | ZK proof of robot AI inference verified on-chain on Stellar | First we know of |
 | Anonymous-but-accountable robot fleet identity (Poseidon Merkle + nullifiers) on Stellar | First we know of |
-| Generic, real-proof-tested native BN254 Groth16 verifier reused across ML-inference and fleet-identity circuits | First we know of |
+| ZK-proved federated-learning **aggregation correctness** (not just local training) bound to a robot fleet's on-chain identity, with autonomous per-contributor XLM payout | First we know of — see `contracts/fleet_learning` and its cited research (arXiv:2503.15550, arXiv:2312.04579, IACR ePrint 2025/2296); closest prior art (`Veriblock-FL`, `fl-chain-data-sharing`, Pacheco et al.'s reputation-token robot-swarm FL) is Ethereum-based, non-robot-specific, or non-ZK, never all three combined with autonomous Stellar payment |
+| Generic, real-proof-tested native BN254 Groth16 verifier reused across ML-inference, fleet-identity, and fleet-learning circuits | First we know of |
 | Autonomous XLM payment gated on an on-chain-verified proof | First we know of |
 | ZK anomaly kill-switch for robots | First we know of |
 
