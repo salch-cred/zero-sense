@@ -12,7 +12,10 @@ use soroban_sdk::{
 /// - claim_task_payment() reads the confidence from the on-chain VERIFIED
 ///   RobotAction via a cross-contract call to the verifier. The caller can NOT
 ///   supply or tamper with the confidence — this prevents payout fraud.
-/// - A task can be paid at most once.
+/// - A task can be paid at most once. State (TaskClaimed) is written BEFORE
+///   the external token transfer (checks-effects-interactions) so that even
+///   a non-standard token implementation that called back into this contract
+///   could not replay a claim mid-transfer.
 
 #[contracttype]
 pub enum DataKey {
@@ -126,6 +129,15 @@ impl RobotPaymentRouter {
             panic!("Confidence too low — payment withheld");
         };
 
+        // Checks-effects-interactions (H4 fix): record the claim BEFORE the
+        // external token transfer, so a claim can never be replayed even if a
+        // future non-standard token implementation called back into this
+        // contract mid-transfer.
+        record.paid_at = env.ledger().timestamp();
+        record.confidence = confidence;
+        env.storage().persistent().set(&DataKey::TaskPayment(task_id.clone()), &record);
+        env.storage().persistent().set(&DataKey::TaskClaimed(task_id.clone()), &true);
+
         let xlm: Address = env.storage().instance().get(&DataKey::XlmToken).unwrap();
         let token_client = token::Client::new(&env, &xlm);
         token_client.transfer(
@@ -133,11 +145,6 @@ impl RobotPaymentRouter {
             &record.operator,
             &pay_amount,
         );
-
-        record.paid_at = env.ledger().timestamp();
-        record.confidence = confidence;
-        env.storage().persistent().set(&DataKey::TaskPayment(task_id.clone()), &record);
-        env.storage().persistent().set(&DataKey::TaskClaimed(task_id.clone()), &true);
 
         env.events().publish(
             ("ZeroSense", "TaskPaymentReleased"),
