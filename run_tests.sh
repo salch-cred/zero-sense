@@ -17,7 +17,7 @@ fi
 
 # ─── RUST CONTRACTS ────────────────────────
 echo ""; echo "🦀 SOROBAN CONTRACT TESTS"
-for contract in verifier payment reputation insurance fleet_identity bn254_verifier fleet_learning; do
+for contract in verifier payment reputation insurance fleet_identity bn254_verifier fleet_learning consensus; do
     echo "  Testing: $contract"
     if (cd contracts/$contract && cargo test 2>&1); then
         echo "  ✅ $contract PASSED"; PASS=$((PASS+1))
