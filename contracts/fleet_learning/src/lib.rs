@@ -41,7 +41,10 @@
 //!    round (and only those robots, and only once) can
 //!    [`FleetLearningCoordinator::claim_reward`] in XLM (or any Stellar asset
 //!    configured as the reward token) — fully autonomous settlement, no
-//!    manual reconciliation.
+//!    manual reconciliation. The claimed flag is recorded before the token
+//!    transfer (checks-effects-interactions), so no reward path can be used
+//!    to double-pay a (round, robot) pair even if a non-standard token
+//!    implementation ever called back into this contract.
 //!
 //! ## Why this is a different trust model than prior blockchain+FL+robotics work
 //!
@@ -258,10 +261,16 @@ impl FleetLearningCoordinator {
 
         let amount: i128 = st.get(&DataKey::RewardPerContributor).unwrap();
         let reward_token: Address = st.get(&DataKey::RewardToken).unwrap();
+
+        // Checks-effects-interactions: record the claim BEFORE making the
+        // external token transfer call, so this (round, robot) pair cannot
+        // be paid twice even if the configured reward-token contract ever
+        // called back into this contract during transfer.
+        st.set(&claimed_key, &true);
+
         let token_client = token::Client::new(&env, &reward_token);
         token_client.transfer(&env.current_contract_address(), &robot, &amount);
 
-        st.set(&claimed_key, &true);
         env.events()
             .publish((symbol_short!("claim"), round), (robot, amount));
         amount
