@@ -244,6 +244,18 @@ impl ZeroSenseVerifier {
         action.map(|a| a.confidence)
     }
 
+    /// Read the robot that produced a verified task's proof. Used by
+    /// `contracts/consensus` (zk-Swarm Consensus) to bind a witness vote to
+    /// the actual prover: a caller cannot borrow someone else's already-
+    /// verified `task_id` to fake being a witness, because this always
+    /// returns the `robot_id` that was `require_auth`'d when the proof was
+    /// originally submitted — never the caller's own address.
+    pub fn get_action_robot(env: Env, task_id: BytesN<32>) -> Option<Address> {
+        let action: Option<RobotAction> =
+            env.storage().persistent().get(&DataKey::RobotAction(task_id));
+        action.map(|a| a.robot_id)
+    }
+
     // ----------------------------- internal -----------------------------
 
     fn u32_from_be(b: &BytesN<32>) -> u32 {
@@ -434,6 +446,7 @@ mod tests {
         );
         assert!(ok);
         assert_eq!(client.get_verified_confidence(&task_id), Some(95));
+        assert_eq!(client.get_action_robot(&task_id), Some(robot));
     }
 
     #[test]
@@ -569,5 +582,19 @@ mod tests {
         client.verify_robot_action(
             &short, &pub_inputs, &robot, &task_id, &model_hash, &95u32, &0u32,
         );
+    }
+
+    #[test]
+    fn test_get_action_robot_none_for_unknown_task() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let cid = env.register_contract(None, ZeroSenseVerifier);
+        let client = ZeroSenseVerifierClient::new(&env, &cid);
+        let admin = Address::generate(&env);
+        let empty: Vec<BytesN<32>> = vec![&env];
+        let (vk, _proof) = valid_instance(&env, &empty);
+        client.initialize(&admin, &vk);
+        let unknown_task = BytesN::from_array(&env, &[99u8; 32]);
+        assert_eq!(client.get_action_robot(&unknown_task), None);
     }
 }
