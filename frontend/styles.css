@@ -1,6 +1,6 @@
 /* ========================================================================
    ZeroSense — Landing Page Styles
-   Design system inspired by handhold.io · Uncut Sans · HugeIcons
+   Design system inspired by handhold.io + spade.com (motion/animation) · Uncut Sans · HugeIcons
    ======================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -69,7 +69,7 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--gray-100);
 .btn-lg { padding: 12px 22px; font-size: 15px; border-radius: 11px; }
 
 /* ─── Hero ─────────────────────────────────────── */
-.hero { padding: 140px 24px 80px; text-align: center; max-width: 820px; margin: 0 auto; }
+.hero { padding: 140px 24px 64px; text-align: center; max-width: 820px; margin: 0 auto; }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--accent-light); color: var(--accent); border: 1px solid #bfdbfe;
@@ -96,11 +96,37 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--gray-100);
 .hero-metric-val { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
 .hero-metric-label { font-size: 13px; color: var(--gray-600); line-height: 1.4; }
 
+/* ─── Intro strip (spade.com "enriching billions of transactions…" bar) ─── */
+.strip { border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); background: var(--gray-50); padding: 16px 24px; text-align: center; }
+.strip p { max-width: 720px; margin: 0 auto; font-size: 13.5px; color: var(--gray-600); }
+.strip strong { color: var(--black); font-weight: 600; }
+
 /* ─── Section ─────────────────────────────────── */
 .section { max-width: 1120px; margin: 0 auto; padding: 80px 24px; }
 .eyebrow { font-size: 13px; font-weight: 600; color: var(--gray-400); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 12px; }
 .section-title { font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -1.2px; line-height: 1.15; margin-bottom: 16px; }
 .section-sub { font-size: 17px; color: var(--gray-600); max-width: 480px; }
+
+/* ─── Split feature rows (spade.com alternating Risk/Rewards/Analytics/UX pattern) ─── */
+.split-features { max-width: 1120px; margin: 0 auto; padding: 88px 24px 24px; display: flex; flex-direction: column; gap: 104px; }
+.split-row { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+.split-row.reverse .split-copy { order: 2; }
+.split-row.reverse .split-stat { order: 1; }
+.split-pill { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--accent); background: var(--accent-light); padding: 5px 12px; border-radius: 100px; margin-bottom: 16px; }
+.split-copy h3 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; letter-spacing: -.8px; margin-bottom: 14px; line-height: 1.2; }
+.split-copy p { font-size: 15.5px; color: var(--gray-600); margin-bottom: 18px; max-width: 420px; }
+.split-link { font-size: 14px; font-weight: 600; color: var(--black); display: inline-flex; align-items: center; gap: 6px; }
+.split-link::after { content: '→'; transition: transform .15s; display: inline-block; }
+.split-link:hover::after { transform: translateX(3px); }
+.split-stat { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 20px; padding: 48px; text-align: center; transition: transform .3s ease, box-shadow .3s ease; }
+.split-stat:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.06); }
+.split-stat-val { font-size: clamp(40px, 6vw, 64px); font-weight: 900; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.split-stat-label { font-size: 13.5px; color: var(--gray-600); margin-top: 10px; }
+
+/* ─── Big single-stat band (spade.com "95% physical transactions matched") ─── */
+.stat-band { max-width: 820px; margin: 0 auto; padding: 8px 24px 96px; text-align: center; }
+.stat-band-val { font-size: clamp(56px, 10vw, 108px); font-weight: 900; letter-spacing: -4px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat-band-label { font-size: 15px; color: var(--gray-600); margin-top: 18px; max-width: 460px; margin-left: auto; margin-right: auto; }
 
 /* ─── Pipeline Tabs ─────────────────────────────── */
 .pipeline-wrap { margin-top: 48px; border: 1px solid var(--gray-200); border-radius: 20px; overflow: hidden; background: var(--gray-50); }
@@ -133,6 +159,14 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--gray-100);
 .feature-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--black); display: grid; place-items: center; margin-bottom: 18px; font-size: 18px; }
 .feature-card h3 { font-size: 17px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 8px; }
 .feature-card p { font-size: 14px; color: var(--gray-600); }
+
+/* ─── Industry / pillar cards (spade.com bracket-label "[fintechs]" style) ─── */
+.industry-grid { margin-top: 48px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--gray-200); border: 1px solid var(--gray-200); border-radius: 20px; overflow: hidden; }
+.industry-card { background: var(--white); padding: 36px 32px; transition: background .15s, transform .15s; }
+.industry-card:hover { background: var(--gray-50); }
+.industry-bracket { font-size: 12px; font-weight: 700; color: var(--gray-400); letter-spacing: .4px; margin-bottom: 14px; }
+.industry-card h3 { font-size: 18px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 10px; }
+.industry-card p { font-size: 14px; color: var(--gray-600); margin-bottom: 16px; }
 
 /* ─── How It Works ───────────────────────────── */
 .hiw-section { background: var(--gray-50); border-top: 1px solid var(--gray-200); border-bottom: 1px solid var(--gray-200); }
@@ -189,6 +223,9 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--gray-100);
 .testimonial-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--gray-200); display: grid; place-items: center; font-size: 14px; font-weight: 700; color: var(--gray-600); flex-shrink: 0; }
 .testimonial-name { font-size: 14px; font-weight: 600; }
 .testimonial-role { font-size: 12px; color: var(--gray-400); }
+.testimonial-stat { border-top: 1px solid var(--gray-100); padding-top: 16px; }
+.testimonial-stat-val { font-size: 28px; font-weight: 900; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+.testimonial-stat-label { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
 
 /* ─── CTA Band ──────────────────────────────── */
 .cta-band { background: var(--black); border-radius: 20px; padding: 64px; text-align: center; margin: 80px auto; max-width: 1120px; }
@@ -199,6 +236,9 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--gray-100);
 .cta-features { display: flex; justify-content: center; gap: 28px; margin-top: 28px; flex-wrap: wrap; }
 .cta-feature { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #737373; }
 .cta-feature-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }
+
+/* ─── Kinetic text (spade.com "e v e r y l a y e r" spreading tagline) ─── */
+.kinetic-text span { display: inline-block; margin-right: 0; transition: margin-right .5s cubic-bezier(.16,1,.3,1); }
 
 /* ─── FAQ ─────────────────────────────────── */
 .faq-list { margin-top: 40px; border-top: 1px solid var(--gray-200); }
@@ -231,9 +271,13 @@ footer { border-top: 1px solid var(--gray-200); padding: 40px 24px; }
   .hero { padding: 100px 20px 60px; }
   .hero h1 { letter-spacing: -1.5px; }
   .hero-metrics { flex-direction: column; }
+  .split-row, .split-row.reverse { grid-template-columns: 1fr; gap: 28px; }
+  .split-row.reverse .split-copy, .split-row.reverse .split-stat { order: initial; }
+  .split-stat { padding: 32px; }
+  .stat-band { padding: 8px 20px 64px; }
   .pipeline-panel.active { grid-template-columns: 1fr; }
   .pipeline-tabs { flex-wrap: wrap; }
-  .feature-grid, .hiw-steps, .testimonials, .live-section { grid-template-columns: 1fr; }
+  .feature-grid, .hiw-steps, .testimonials, .live-section, .industry-grid { grid-template-columns: 1fr; }
   .agents-grid { grid-template-columns: repeat(2, 1fr); }
   .cta-band { padding: 40px 24px; }
   .cta-features { flex-direction: column; gap: 12px; align-items: center; }
